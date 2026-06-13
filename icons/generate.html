@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>生成图标</title>
+</head>
+<body>
+  <script>
+    // 生成所有尺寸的图标
+    const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+    
+    sizes.forEach(size => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      
+      // 背景渐变
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#2563eb');
+      gradient.addColorStop(1, '#1d4ed8');
+      ctx.fillStyle = gradient;
+      
+      // 圆角矩形背景
+      const radius = size * 0.15;
+      ctx.beginPath();
+      ctx.moveTo(radius, 0);
+      ctx.lineTo(size - radius, 0);
+      ctx.quadraticCurveTo(size, 0, size, radius);
+      ctx.lineTo(size, size - radius);
+      ctx.quadraticCurveTo(size, size, size - radius, size);
+      ctx.lineTo(radius, size);
+      ctx.quadraticCurveTo(0, size, 0, size - radius);
+      ctx.lineTo(0, radius);
+      ctx.quadraticCurveTo(0, 0, radius, 0);
+      ctx.fill();
+      
+      // 笔记图标
+      ctx.fillStyle = '#ffffff';
+      const iconSize = size * 0.5;
+      const iconX = (size - iconSize) / 2;
+      const iconY = (size - iconSize) / 2;
+      
+      // 纸张
+      ctx.fillRect(iconX, iconY, iconSize, iconSize * 0.8);
+      
+      // 文字线条
+      ctx.fillStyle = '#2563eb';
+      const lineY = iconY + iconSize * 0.15;
+      const lineWidth = iconSize * 0.6;
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(iconX + iconSize * 0.15, lineY + i * iconSize * 0.15, lineWidth, iconSize * 0.08);
+      }
+      
+      // 铅笔
+      ctx.fillStyle = '#f59e0b';
+      const pencilX = iconX + iconSize * 0.7;
+      const pencilY = iconY + iconSize * 0.5;
+      ctx.fillRect(pencilX, pencilY, iconSize * 0.2, iconSize * 0.4);
+      
+      // 输出
+      const link = document.createElement('a');
+      link.download = `icon-${size}.png`;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+    });
+  </script>
+  <p>图标已生成，请查看下载文件</p>
+</body>
+</html>

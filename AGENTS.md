@@ -1,65 +1,144 @@
-# 项目上下文
+# 智能记事本 - 项目文档
 
-### 版本技术栈
+## 项目概述
 
-- **Framework**: Next.js 16 (App Router)
-- **Core**: React 19
-- **Language**: TypeScript 5
-- **UI 组件**: shadcn/ui (基于 Radix UI)
-- **Styling**: Tailwind CSS 4
+智能记事本是一款支持离线使用的笔记应用，能够自动解析文本中的时间信息并设置提醒。
+
+## 技术栈
+
+- **前端框架**: 原生 JavaScript (ES6+)
+- **本地存储**: IndexedDB
+- **样式**: 纯 CSS (移动端优先)
+- **PWA支持**: Service Worker + Web App Manifest
 
 ## 目录结构
 
 ```
-├── public/                 # 静态资源
-├── scripts/                # 构建与启动脚本
-│   ├── build.sh            # 构建脚本
-│   ├── dev.sh              # 开发环境启动脚本
-│   ├── prepare.sh          # 预处理脚本
-│   └── start.sh            # 生产环境启动脚本
-├── src/
-│   ├── app/                # 页面路由与布局
-│   ├── components/ui/      # Shadcn UI 组件库
-│   ├── hooks/              # 自定义 Hooks
-│   ├── lib/                # 工具库
-│   │   └── utils.ts        # 通用工具函数 (cn)
-│   └── server.ts           # 自定义服务端入口
-├── next.config.ts          # Next.js 配置
-├── package.json            # 项目依赖管理
-└── tsconfig.json           # TypeScript 配置
+.
+├── index.html          # 主HTML页面
+├── manifest.json       # PWA应用配置
+├── sw.js               # Service Worker (离线支持)
+├── capacitor.config.json # Capacitor配置 (用于打包APK)
+├── styles/
+│   └── main.css        # 主样式文件
+├── js/
+│   └── app.js          # 主应用逻辑
+└── icons/
+│   ├── icon-72.svg     # 应用图标
+│   ├── icon-192.svg
+│   └── icon-512.svg
 ```
 
-- 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
+## 功能模块
 
-## 包管理规范
+### 1. IndexedDB 存储 (`NoteDB` 类)
+- 笔记增删改查
+- 提醒队列管理
+- 搜索功能
 
-**仅允许使用 pnpm** 作为包管理器，**严禁使用 npm 或 yarn**。
-**常用命令**：
-- 安装依赖：`pnpm add <package>`
-- 安装开发依赖：`pnpm add -D <package>`
-- 安装所有依赖：`pnpm install`
-- 移除依赖：`pnpm remove <package>`
+### 2. 时间解析器 (`TimeParser` 类)
+支持解析以下格式：
+- 相对时间: "2小时后"、"30分钟后"
+- 日期关键词: "明天"、"后天"
+- 星期: "周五"、"星期一"
+- 时段: "上午"、"下午"、"晚上"
+- 具体时间: "8点"、"下午3点半"
+- 组合: "明天8点开会"、"周五下午3点"
 
-## 开发规范
+### 3. 提醒管理 (`ReminderManager` 类)
+- Web Notification API
+- 定时检查提醒队列
+- 提醒触发后推送通知
 
-### 编码规范
+### 4. 应用核心 (`App` 类)
+- UI 状态管理
+- 事件绑定
+- 笔记列表渲染
+- 弹窗交互
 
-- 默认按 TypeScript `strict` 心智写代码；优先复用当前作用域已声明的变量、函数、类型和导入，禁止引用未声明标识符或拼错变量名。
-- 禁止隐式 `any` 和 `as any`；函数参数、返回值、解构项、事件对象、`catch` 错误在使用前应有明确类型或先完成类型收窄，并清理未使用的变量和导入。
+## 使用说明
 
-### next.config 配置规范
+### 在浏览器中使用 (PWA)
+1. 访问应用URL
+2. 添加笔记时输入如 "明天8点开会"
+3. 系统自动识别时间，可启用提醒
+4. 允许通知权限以接收提醒
 
-- 配置的路径不要写死绝对路径，必须使用 path.resolve(__dirname, ...)、import.meta.dirname 或 process.cwd() 动态拼接。
+### 添加到手机主屏幕
+- **Android**: Chrome浏览器菜单 → "添加到主屏幕"
+- **iOS**: Safari分享 → "添加到主屏幕"
 
-### Hydration 问题防范
+## APK打包指南
 
-1. 严禁在 JSX 渲染逻辑中直接使用 typeof window、Date.now()、Math.random() 等动态数据。**必须使用 'use client' 并配合 useEffect + useState 确保动态内容仅在客户端挂载后渲染**；同时严禁非法 HTML 嵌套（如 <p> 嵌套 <div>）。
-2. **禁止使用 head 标签**，优先使用 metadata，详见文档：https://nextjs.org/docs/app/api-reference/functions/generate-metadata
-   1. 三方 CSS、字体等资源可在 `globals.css` 中顶部通过 `@import` 引入或使用 next/font
-   2. preload, preconnect, dns-prefetch 通过 ReactDOM 的 preload、preconnect、dns-prefetch 方法引入
-   3. json-ld 可阅读 https://nextjs.org/docs/app/guides/json-ld
+### 方式一: Capacitor (推荐)
 
-## UI 设计与组件规范 (UI & Styling Standards)
+```bash
+# 1. 安装依赖
+npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications
 
-- 模板默认预装核心组件库 `shadcn/ui`，位于`src/components/ui/`目录下
-- Next.js 项目**必须默认**采用 shadcn/ui 组件、风格和规范，**除非用户指定用其他的组件和规范。**
+# 2. 初始化Capacitor
+npx cap init "智能记事本" "com.smartnotes.app" --web-dir="./"
+
+# 3. 添加Android平台
+npx cap add android
+
+# 4. 复制Web资源
+npx cap copy
+
+# 5. 打开Android项目进行构建
+npx cap open android
+```
+
+在Android Studio中:
+- Build → Build Bundle(s) / APK(s) → Build APK(s)
+- APK生成在 `android/app/build/outputs/apk/debug/`
+
+### 方式二: Ionic Appflow (在线构建)
+1. 注册 Ionic Appflow 账号
+2. 上传项目代码
+3. 选择 Android Package 构建
+4. 下载生成的 APK
+
+## 系统闹钟扩展
+
+Web应用只能使用浏览器通知，无法设置真正的系统闹钟。如需系统闹钟功能，需要添加原生代码:
+
+### Android扩展 (使用 Capacitor Plugin)
+
+```javascript
+// 在app.js中添加
+import { LocalNotifications } from '@capacitor/local-notifications';
+
+async function scheduleAlarm(note) {
+  await LocalNotifications.schedule({
+    notifications: [{
+      title: '智能记事本提醒',
+      body: note.content,
+      id: note.id,
+      schedule: { at: new Date(note.reminderTime) },
+      sound: 'alarm_sound.mp3',
+      channelId: 'reminders',
+    }]
+  });
+}
+```
+
+需要在 `capacitor.config.json` 中配置:
+```json
+{
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_alarm",
+      "iconColor": "#2563eb",
+      "sound": "alarm_sound.mp3"
+    }
+  }
+}
+```
+
+## 注意事项
+
+1. **离线运行**: Service Worker 缓存所有静态资源，IndexedDB 存储数据
+2. **通知权限**: 用户需要手动授权通知权限
+3. **浏览器限制**: 关闭浏览器后无法触发通知，建议打包为 APK
+4. **数据安全**: 所有数据存储在本地，不上传服务器

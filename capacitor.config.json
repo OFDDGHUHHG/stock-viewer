@@ -1,0 +1,17 @@
+{
+  "appId": "com.smartnotes.app",
+  "appName": "智能记事本",
+  "webDir": "./",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_alarm",
+      "iconColor": "#2563eb"
+    }
+  }
+}

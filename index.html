@@ -1,33 +1,123 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="扣子编程，你的 AI 开发伙伴已就位" />
-    <title>扣子编程 - AI 开发伙伴</title>
-    <link rel="stylesheet" href="/styles/main.css" />
-  </head>
-  <body>
-    <div id="app">
-      <main class="main-wrapper">
-        <div class="content-container">
-          <img
-            src="https://lf-coze-web-cdn.coze.cn/obj/eden-cn/lm-lgvj/ljhwZthlaukjlkulzlp/coze-coding/icon/coze-coding.gif"
-            alt="扣子编程 Logo"
-            class="logo-image"
-          />
-          <div>
-            <div class="text-container">
-              <h1 class="heading">
-                应用开发中
-              </h1>
-              <p class="description">
-                请稍后，页面即将呈现
-              </p>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="智能记事本 - 自动解析提醒时间">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="智能记事本">
+  <title>智能记事本</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/icon-192.svg" sizes="192x192">
+  <link rel="apple-touch-icon" href="/icons/icon-192.svg">
+  <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 头部导航 -->
+    <header class="header">
+      <h1 class="app-title">智能记事本</h1>
+      <div class="header-actions">
+        <button id="searchBtn" class="icon-btn" title="搜索">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+        </button>
+        <button id="addBtn" class="icon-btn primary" title="新建笔记">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 搜索面板 -->
+    <div id="searchPanel" class="search-panel hidden">
+      <div class="search-input-wrap">
+        <input type="text" id="searchInput" placeholder="搜索笔记..." autocomplete="off">
+        <button id="clearSearchBtn" class="clear-btn hidden">×</button>
+      </div>
+      <button id="closeSearchBtn" class="text-btn">取消</button>
+    </div>
+
+    <!-- 笔记列表 -->
+    <main class="main-content">
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-icon">📝</div>
+        <p class="empty-text">暂无笔记</p>
+        <p class="empty-hint">点击右上角 + 添加第一条笔记</p>
+      </div>
+      <ul id="noteList" class="note-list"></ul>
+    </main>
+
+    <!-- 编辑弹窗 -->
+    <div id="editModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <header class="modal-header">
+          <h2 id="modalTitle">新建笔记</h2>
+          <button id="closeModalBtn" class="icon-btn">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </header>
+        <div class="modal-body">
+          <textarea id="noteContent" placeholder="输入笔记内容，例如：明天8点开会" rows="6"></textarea>
+          <div id="parsedReminder" class="parsed-reminder hidden">
+            <div class="reminder-icon">🔔</div>
+            <div class="reminder-info">
+              <span class="reminder-label">识别到提醒时间：</span>
+              <span id="reminderTime" class="reminder-time"></span>
+            </div>
+            <button id="toggleReminderBtn" class="toggle-btn">启用</button>
+          </div>
+          <div id="customReminder" class="custom-reminder">
+            <div class="custom-label">自定义提醒时间：</div>
+            <div class="custom-inputs">
+              <input type="datetime-local" id="customTimeInput">
+              <button id="setCustomBtn" class="small-btn">设置</button>
             </div>
           </div>
         </div>
-      </main>
+        <footer class="modal-footer">
+          <button id="deleteNoteBtn" class="danger-btn hidden">删除</button>
+          <button id="saveNoteBtn" class="primary-btn">保存</button>
+        </footer>
+      </div>
     </div>
-  </body>
+
+    <!-- 提示弹窗 -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- 提醒管理弹窗 -->
+    <div id="reminderModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content small">
+        <header class="modal-header">
+          <h2>提醒设置</h2>
+          <button id="closeReminderModalBtn" class="icon-btn">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </header>
+        <div class="modal-body">
+          <div class="reminder-setting">
+            <p class="setting-desc">启用通知提醒，系统会在设定时间推送提醒</p>
+            <button id="requestNotifyBtn" class="primary-btn">开启通知权限</button>
+          </div>
+          <div id="pendingReminders" class="pending-list">
+            <h3>待触发提醒</h3>
+            <ul id="reminderList"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
 </html>
