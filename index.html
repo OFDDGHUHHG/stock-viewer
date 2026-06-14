@@ -25,6 +25,16 @@
             <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
           </svg>
         </button>
+        <button id="dateFilterBtn" class="icon-btn" title="按日期筛选">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
+          </svg>
+        </button>
+        <button id="moreBtn" class="icon-btn" title="更多">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+          </svg>
+        </button>
         <button id="addBtn" class="icon-btn primary" title="新建笔记">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -33,13 +43,62 @@
       </div>
     </header>
 
+    <!-- 日期筛选指示器 -->
+    <div id="dateFilterIndicator" class="date-filter-indicator hidden">
+      <span id="filterDateText"></span>
+      <button id="clearDateFilterBtn" class="clear-filter-btn hidden">清除</button>
+    </div>
+
     <!-- 搜索面板 -->
     <div id="searchPanel" class="search-panel hidden">
-      <div class="search-input-wrap">
-        <input type="text" id="searchInput" placeholder="搜索笔记..." autocomplete="off">
-        <button id="clearSearchBtn" class="clear-btn hidden">×</button>
+      <div class="modal-backdrop"></div>
+      <div class="search-content">
+        <div class="search-input-wrap">
+          <input type="text" id="searchInput" placeholder="搜索笔记..." autocomplete="off">
+          <button id="clearSearchBtn" class="clear-btn hidden">×</button>
+        </div>
+        <button id="closeSearchBtn" class="text-btn">取消</button>
       </div>
-      <button id="closeSearchBtn" class="text-btn">取消</button>
+    </div>
+
+    <!-- 日历面板 -->
+    <div id="calendarPanel" class="calendar-panel hidden">
+      <div class="modal-backdrop"></div>
+      <div class="calendar-content">
+        <div class="calendar-header-row">
+          <button id="prevMonthBtn" class="cal-nav-btn">&lt;</button>
+          <span id="calendarTitle" class="cal-title">2024年1月</span>
+          <button id="nextMonthBtn" class="cal-nav-btn">&gt;</button>
+          <button id="closeCalendarBtn" class="text-btn">关闭</button>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </div>
+    </div>
+
+    <!-- 更多菜单面板 -->
+    <div id="morePanel" class="more-panel hidden">
+      <div class="modal-backdrop"></div>
+      <div class="more-content">
+        <div class="more-header">
+          <span>更多功能</span>
+          <button id="closeMoreBtn" class="text-btn">关闭</button>
+        </div>
+        <div class="more-menu">
+          <button id="exportBtn" class="more-item">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z"/>
+            </svg>
+            <span>导出记录</span>
+          </button>
+          <button id="importBtn" class="more-item">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+              <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6-.67l2.59 2.58L17 12.5l-5-5-5 5 1.41 1.41L11 11.33V21h2z"/>
+            </svg>
+            <span>导入记录</span>
+            <input type="file" id="importFile" accept=".json" hidden>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- 笔记列表 -->
@@ -56,66 +115,68 @@
     <div id="editModal" class="modal hidden">
       <div class="modal-backdrop"></div>
       <div class="modal-content">
-        <header class="modal-header">
+        <div class="modal-header">
           <h2 id="modalTitle">新建笔记</h2>
-          <button id="closeModalBtn" class="icon-btn">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-            </svg>
-          </button>
-        </header>
+          <button id="closeModalBtn" class="close-btn">×</button>
+        </div>
         <div class="modal-body">
-          <textarea id="noteContent" placeholder="输入笔记内容，例如：明天8点开会" rows="6"></textarea>
+          <textarea id="noteContent" placeholder="输入笔记内容...&#10;&#10;试试输入：明天8点开会&#10;后天下午3点见客户&#10;周五晚上聚餐&#10;2小时后提醒我" rows="4"></textarea>
+          
+          <!-- 解析的提醒 -->
           <div id="parsedReminder" class="parsed-reminder hidden">
-            <div class="reminder-icon">🔔</div>
             <div class="reminder-info">
-              <span class="reminder-label">识别到提醒时间：</span>
+              <span class="reminder-icon">🔔</span>
               <span id="reminderTime" class="reminder-time"></span>
             </div>
             <button id="toggleReminderBtn" class="toggle-btn">启用</button>
           </div>
-          <div id="customReminder" class="custom-reminder">
-            <div class="custom-label">自定义提醒时间：</div>
-            <div class="custom-inputs">
-              <input type="datetime-local" id="customTimeInput">
-              <button id="setCustomBtn" class="small-btn">设置</button>
-            </div>
+          
+          <!-- 自定义时间 -->
+          <div class="custom-time-row">
+            <input type="datetime-local" id="customTimeInput" class="custom-time-input">
+            <button id="setCustomBtn" class="small-btn">自定义时间</button>
           </div>
+          
+          <!-- 标记按钮 -->
+          <button id="toggleMarkBtn" class="mark-btn">标记</button>
         </div>
-        <footer class="modal-footer">
+        <div class="modal-footer">
           <button id="deleteNoteBtn" class="danger-btn hidden">删除</button>
           <button id="saveNoteBtn" class="primary-btn">保存</button>
-        </footer>
+        </div>
       </div>
     </div>
 
-    <!-- 提示弹窗 -->
-    <div id="toast" class="toast hidden"></div>
-
-    <!-- 提醒管理弹窗 -->
+    <!-- 提醒权限弹窗 -->
     <div id="reminderModal" class="modal hidden">
       <div class="modal-backdrop"></div>
       <div class="modal-content small">
-        <header class="modal-header">
-          <h2>提醒设置</h2>
-          <button id="closeReminderModalBtn" class="icon-btn">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-            </svg>
-          </button>
-        </header>
+        <div class="modal-header">
+          <h2>开启提醒</h2>
+          <button id="closeReminderModalBtn" class="close-btn">×</button>
+        </div>
         <div class="modal-body">
-          <div class="reminder-setting">
-            <p class="setting-desc">启用通知提醒，系统会在设定时间推送提醒</p>
-            <button id="requestNotifyBtn" class="primary-btn">开启通知权限</button>
-          </div>
-          <div id="pendingReminders" class="pending-list">
-            <h3>待触发提醒</h3>
-            <ul id="reminderList"></ul>
-          </div>
+          <p class="reminder-desc">为了收到提醒通知，请开启通知权限</p>
+          <button id="requestNotifyBtn" class="primary-btn full-width">开启通知</button>
         </div>
       </div>
     </div>
+
+    <!-- 提醒弹窗（到时提醒） -->
+    <div id="reminderAlert" class="reminder-alert hidden">
+      <div class="reminder-alert-content">
+        <div class="reminder-alert-icon">🔔</div>
+        <div class="reminder-alert-title">提醒时间到了！</div>
+        <div id="reminderAlertContent" class="reminder-alert-text"></div>
+        <div class="reminder-alert-actions">
+          <button id="dismissReminderBtn" class="dismiss-btn">关闭</button>
+          <button id="viewReminderBtn" class="view-btn">查看详情</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast" class="toast hidden"></div>
   </div>
 
   <script src="/js/app.js"></script>
