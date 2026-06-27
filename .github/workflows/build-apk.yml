@@ -48,8 +48,15 @@ jobs:
       - name: Fix Kotlin Dependencies Conflict
         working-directory: android
         run: |
-          sed -i '7a ext.kotlin_version = "1.8.22"' build.gradle
-          sed -i '/dependencies {/a implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"' app/build.gradle
+          cat >> app/build.gradle << 'EOF'
+          configurations.all {
+            resolutionStrategy {
+              force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+              force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+              force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+            }
+          }
+          EOF
       
       - name: Build APK
         working-directory: android
