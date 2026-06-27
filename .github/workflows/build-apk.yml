@@ -22,7 +22,7 @@ jobs:
           npm install @capacitor/core @capacitor/cli @capacitor/android
       
       - name: Initialize Capacitor
-        run: npx cap init "股票看盘" "com.stockapp.viewer" --web-dir="./"
+        run: npx cap init "股票看盘" "com.stockapp.viewer" --web-dir "."
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -32,6 +32,9 @@ jobs:
       
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+      
+      - name: Accept Android SDK License
+        run: yes | sdkmanager --licenses || true
       
       - name: Add Android Platform
         run: npx cap add android
