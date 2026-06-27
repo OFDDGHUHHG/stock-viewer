@@ -22,7 +22,8 @@ jobs:
           npm install @capacitor/core @capacitor/cli @capacitor/android
       
       - name: Initialize Capacitor
-        run: npx cap init "股票看盘" "com.stockapp.viewer" --web-dir "."
+        run: |
+          echo '{"appId":"com.stockapp.viewer","appName":"股票看盘","webDir":".","server":{"androidScheme":"http"}}' > capacitor.config.json
       
       - name: Setup Java
         uses: actions/setup-java@v4
