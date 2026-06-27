@@ -23,7 +23,9 @@ jobs:
       
       - name: Initialize Capacitor
         run: |
-          echo '{"appId":"com.stockapp.viewer","appName":"股票看盘","webDir":".","server":{"androidScheme":"http"}}' > capacitor.config.json
+          mkdir -p www
+          cp -r index.html js styles icons manifest.json sw.js www/
+          echo '{"appId":"com.stockapp.viewer","appName":"股票看盘","webDir":"www","server":{"androidScheme":"http"}}' > capacitor.config.json
       
       - name: Setup Java
         uses: actions/setup-java@v4
