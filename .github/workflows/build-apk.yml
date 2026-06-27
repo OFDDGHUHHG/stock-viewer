@@ -45,6 +45,12 @@ jobs:
       - name: Copy Web Assets
         run: npx cap copy
       
+      - name: Fix Kotlin Dependencies Conflict
+        working-directory: android
+        run: |
+          sed -i '7a ext.kotlin_version = "1.8.22"' build.gradle
+          sed -i '/dependencies {/a implementation "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"' app/build.gradle
+      
       - name: Build APK
         working-directory: android
         run: |
