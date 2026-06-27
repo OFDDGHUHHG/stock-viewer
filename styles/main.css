@@ -1,21 +1,8 @@
-/* 智能记事本样式 - 移动端优先设计 */
+/**
+ * 股票应用样式 - 移动端优先设计
+ */
 
-:root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --danger: #dc2626;
-  --success: #059669;
-  --warning: #f59e0b;
-  --bg: #f5f5f5;
-  --card: #ffffff;
-  --text: #333333;
-  --text-light: #666666;
-  --border: #e5e5e5;
-  --marked-bg: #fef3c7;
-  --marked-border: #fbbf24;
-  --shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
+/* ==================== 基础样式 ==================== */
 * {
   margin: 0;
   padding: 0;
@@ -24,475 +11,436 @@
 
 html, body {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #f5f5f5;
+  color: #333;
+  overflow-x: hidden;
 }
 
-#app {
-  height: 100%;
+body {
   display: flex;
   flex-direction: column;
-  max-width: 600px;
-  margin: 0 auto;
+  min-height: 100vh;
 }
 
-/* 头部 */
+/* ==================== 顶部导航栏 ==================== */
 .header {
-  position: sticky;
-  top: 0;
-  background: var(--card);
-  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #1890ff, #0050b3);
+  color: #fff;
+  position: sticky;
+  top: 0;
   z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
-.app-title {
+.header-title h1 {
   font-size: 18px;
   font-weight: 600;
-  color: var(--primary);
 }
 
 .header-actions {
   display: flex;
-  gap: 8px;
-}
-
-.icon-btn {
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--text-light);
-  cursor: pointer;
-  display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
 }
 
-.icon-btn:hover {
-  background: var(--bg);
-}
-
-.icon-btn.primary {
-  background: var(--primary);
-  color: white;
-}
-
-.icon-btn.primary:hover {
-  background: var(--primary-dark);
-}
-
-/* 日期筛选指示器 */
-.date-filter-indicator {
-  padding: 8px 16px;
-  background: var(--marked-bg);
-  border-bottom: 1px solid var(--marked-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.clear-filter-btn {
-  padding: 4px 12px;
-  background: var(--primary);
-  color: white;
+.data-source-select {
+  padding: 6px 10px;
   border: none;
-  border-radius: 16px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
   font-size: 12px;
-  cursor: pointer;
-}
-
-/* 搜索面板 */
-.search-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 200;
-}
-
-.search-content {
-  background: var(--card);
-  padding: 16px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-}
-
-.search-input-wrap {
-  flex: 1;
-  display: flex;
-  background: var(--bg);
-  border-radius: 24px;
-  padding: 8px 16px;
-  align-items: center;
-}
-
-.search-input-wrap input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  font-size: 16px;
   outline: none;
 }
 
-.clear-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: 50%;
-  background: var(--border);
-  color: var(--text);
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.text-btn {
-  border: none;
-  background: transparent;
-  color: var(--primary);
-  font-size: 16px;
-  cursor: pointer;
-}
-
-/* 日历面板 */
-.calendar-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 200;
-}
-
-.calendar-content {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--card);
-  padding: 16px;
-  border-radius: 16px 16px 0 0;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.calendar-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-
-.cal-nav-btn {
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 18px;
-  cursor: pointer;
-}
-
-.cal-title {
-  font-size: 18px;
-  font-weight: 600;
-  min-width: 120px;
-  text-align: center;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  padding-top: 12px;
-}
-
-.calendar-header {
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-light);
-  padding: 8px 0;
-}
-
-.calendar-day {
-  text-align: center;
-  padding: 12px 0;
-  font-size: 14px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.calendar-day:not(.empty):hover {
-  background: var(--bg);
-}
-
-.calendar-day.today {
-  background: var(--primary);
-  color: white;
-  font-weight: 600;
-}
-
-.calendar-day.selected {
-  background: var(--warning);
-  color: white;
-  font-weight: 600;
-}
-
-.calendar-day.has-notes {
+/* ==================== 搜索区域 ==================== */
+.search-box {
   position: relative;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
 }
 
-.calendar-day.has-notes::after {
-  content: '';
+#searchInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+#searchInput:focus {
+  border-color: #1890ff;
+}
+
+.search-results {
   position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--primary);
+  top: 100%;
+  left: 16px;
+  right: 16px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 50;
+  display: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.calendar-day.empty {
-  cursor: default;
-  color: var(--border);
-}
-
-/* 更多菜单面板 */
-.more-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 200;
-}
-
-.more-content {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--card);
-  padding: 16px;
-  border-radius: 16px 16px 0 0;
-}
-
-.more-header {
+.search-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 16px;
-  font-size: 18px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.search-item:last-child {
+  border-bottom: none;
+}
+
+.search-item:hover {
+  background: #f5f5f5;
+}
+
+.stock-code {
+  font-size: 12px;
+  color: #666;
+}
+
+.stock-name {
+  font-size: 14px;
+  color: #333;
+  flex: 1;
+  margin-left: 10px;
+}
+
+.stock-price {
+  font-size: 12px;
   font-weight: 600;
 }
 
-.more-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.more-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  background: var(--bg);
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  color: var(--text);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.more-item:hover {
-  background: var(--border);
-}
-
-.more-item svg {
-  color: var(--primary);
-}
-
-/* 主内容区 */
-.main-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-/* 空状态 */
-.empty-state {
+.search-empty {
+  padding: 20px;
   text-align: center;
-  padding: 60px 20px;
+  color: #999;
 }
 
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
+/* ==================== 股票信息区域 ==================== */
+.stock-info {
+  padding: 16px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
 }
 
-.empty-text {
-  font-size: 18px;
-  color: var(--text);
+.stock-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.empty-hint {
-  font-size: 14px;
-  color: var(--text-light);
+.stock-name-large {
+  font-size: 20px;
+  font-weight: 600;
 }
 
-/* 笔记列表 */
-.note-list {
+.stock-code-large {
+  font-size: 12px;
+  color: #666;
+}
+
+.price-info {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.current-price {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.price-change, .price-percent {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.price-info.up {
+  color: #f54545;
+}
+
+.price-info.down {
+  color: #0f0f0f;
+}
+
+/* ==================== 操作按钮 ==================== */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #1890ff;
+  border-radius: 8px;
+  background: #fff;
+  color: #1890ff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: #1890ff;
+  color: #fff;
+}
+
+.action-btn.favorited {
+  background: #1890ff;
+  color: #fff;
+}
+
+.reminder-btn {
+  border-color: #fa8c16;
+  color: #fa8c16;
+}
+
+.reminder-btn:hover {
+  background: #fa8c16;
+  color: #fff;
+}
+
+.list-btn {
+  border-color: #52c41a;
+  color: #52c41a;
+}
+
+.list-btn:hover {
+  background: #52c41a;
+  color: #fff;
+}
+
+/* ==================== K线周期切换 ==================== */
+.period-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.period-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  background: #f0f0f0;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn.active {
+  background: #1890ff;
+  color: #fff;
+}
+
+.period-btn:hover:not(.active) {
+  background: #e0e0e0;
+}
+
+/* ==================== K线图区域 ==================== */
+.kline-container {
+  position: relative;
+  height: 280px;
+  background: #fff;
+  margin: 0 16px 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+#klineCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.kline-tooltip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.95);
+  border-radius: 4px;
+  font-size: 12px;
+  color: #333;
+  z-index: 10;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  min-width: 140px;
+}
+
+.tooltip-date {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tooltip-change {
+  font-weight: 600;
+}
+
+.tooltip-change.up {
+  color: #f54545;
+}
+
+.tooltip-change.down {
+  color: #0f0f0f;
+}
+
+/* ==================== 自选股列表 ==================== */
+.favorites-section {
+  flex: 1;
+  padding: 16px;
+  background: #fff;
+  border-radius: 8px 8px 0 0;
+  margin: 0 16px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.favorite-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.note-item {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.note-item:hover {
-  box-shadow: var(--shadow);
-}
-
-.note-item.marked {
-  background: var(--marked-bg);
-  border-color: var(--marked-border);
-  border-left: 4px solid var(--marked-border);
-}
-
-.mark-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
-  font-size: 20px;
-  cursor: pointer;
-  color: var(--text-light);
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.mark-btn:hover {
-  transform: scale(1.1);
-}
-
-.mark-btn.marked {
-  color: var(--warning);
-}
-
-.note-content {
-  flex: 1;
-  font-size: 16px;
-  line-height: 1.5;
-  word-break: break-word;
-}
-
-.note-meta {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
   gap: 8px;
 }
 
-.note-time {
-  font-size: 12px;
-  color: var(--text-light);
-}
-
-.note-time.has-reminder {
-  color: var(--primary);
-  font-weight: 500;
-}
-
-.reminder-badge {
-  display: inline-flex;
+.favorite-item {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: rgba(37, 99, 235, 0.1);
+  padding: 12px;
+  background: #f9f9f9;
   border-radius: 8px;
-  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-/* 弹窗基础样式 */
+.favorite-item:hover {
+  background: #f0f0f0;
+}
+
+.favorite-item.active {
+  background: #e6f7ff;
+  border: 1px solid #1890ff;
+}
+
+.fav-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.fav-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fav-code {
+  font-size: 12px;
+  color: #666;
+}
+
+.fav-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fav-price.loading {
+  color: #999;
+}
+
+.fav-price.up {
+  color: #f54545;
+}
+
+.fav-price.down {
+  color: #0f0f0f;
+}
+
+.remove-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.empty-tip {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+/* ==================== 弹窗样式 ==================== */
 .modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 300;
-}
-
-.modal-backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   background: rgba(0,0,0,0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 200;
+  padding: 16px;
 }
 
 .modal-content {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--card);
-  padding: 20px;
-  border-radius: 16px 16px 0 0;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.modal-content.small {
-  max-width: 400px;
-  margin: 0 auto;
-  bottom: 50%;
-  transform: translateY(50%);
-  border-radius: 16px;
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
 }
 
-.modal-header h2 {
+.modal-title {
   font-size: 18px;
+  font-weight: 600;
 }
 
 .close-btn {
@@ -500,326 +448,264 @@ html, body {
   height: 32px;
   border: none;
   border-radius: 50%;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 20px;
+  background: #f0f0f0;
+  font-size: 18px;
   cursor: pointer;
 }
 
 .modal-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* 文本输入 */
-textarea {
-  width: 100%;
   padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-size: 16px;
-  resize: none;
-  outline: none;
-  font-family: inherit;
-  line-height: 1.5;
 }
 
-textarea:focus {
-  border-color: var(--primary);
-}
-
-textarea::placeholder {
-  color: var(--text-light);
-}
-
-/* 解析的提醒 */
-.parsed-reminder {
+.modal-actions {
   display: flex;
-  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid #eee;
+}
+
+.reminder-stock-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.form-select, .form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.form-input:focus, .form-select:focus {
+  border-color: #1890ff;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-confirm {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #1890ff;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ==================== 提醒列表 ==================== */
+.modal-list {
+  max-height: 400px;
+}
+
+.modal-list .modal-body {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.reminder-item {
+  display: flex;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: rgba(37, 99, 235, 0.1);
-  border-radius: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.reminder-item.triggered {
+  background: #fff7e6;
+  border: 1px solid #ffd591;
 }
 
 .reminder-info {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
 }
 
-.reminder-icon {
-  font-size: 20px;
-}
-
-.reminder-time {
-  font-size: 16px;
-  color: var(--primary);
-  font-weight: 500;
-}
-
-.toggle-btn {
-  padding: 8px 16px;
-  border: 1px solid var(--primary);
-  border-radius: 20px;
-  background: transparent;
-  color: var(--primary);
+.reminder-name {
   font-size: 14px;
-  cursor: pointer;
+  font-weight: 600;
 }
 
-.toggle-btn.active {
-  background: var(--primary);
-  color: white;
+.reminder-condition {
+  font-size: 12px;
+  color: #666;
 }
 
-/* 自定义时间 */
-.custom-time-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+.triggered-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: #fa8c16;
+  color: #fff;
+  border-radius: 4px;
 }
 
-.custom-time-input {
-  flex: 1;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-.small-btn {
-  padding: 12px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-/* 标记按钮 */
-.mark-btn-full {
-  padding: 12px 16px;
-  background: var(--marked-bg);
-  border: 1px solid var(--marked-border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mark-btn-full.active {
-  background: var(--warning);
-  color: white;
-}
-
-/* 弹窗底部 */
-.modal-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-.primary-btn {
-  padding: 12px 24px;
-  background: var(--primary);
-  color: white;
+.remove-reminder-btn {
+  padding: 6px 12px;
   border: none;
-  border-radius: 24px;
-  font-size: 16px;
+  border-radius: 4px;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 12px;
   cursor: pointer;
 }
 
-.primary-btn:hover {
-  background: var(--primary-dark);
-}
-
-.primary-btn.full-width {
-  width: 100%;
-}
-
-.danger-btn {
-  padding: 12px 24px;
-  background: transparent;
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 24px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.reminder-desc {
-  font-size: 14px;
-  color: var(--text-light);
-  text-align: center;
-}
-
-/* 提醒弹窗 */
-.reminder-alert {
+/* ==================== 价格提醒弹窗 ==================== */
+.alert-modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(245, 158, 11, 0.9);
-  z-index: 400;
-  display: flex;
-  align-items: center;
+  background: rgba(0,0,0,0.6);
+  display: none;
   justify-content: center;
+  align-items: center;
+  z-index: 300;
+  padding: 16px;
 }
 
-.reminder-alert-content {
-  background: var(--card);
-  padding: 24px;
+.alert-content {
+  width: 100%;
+  max-width: 320px;
+  background: #fff;
   border-radius: 16px;
+  padding: 24px;
   text-align: center;
-  max-width: 400px;
-  margin: 16px;
-  animation: alert-bounce 0.5s ease;
 }
 
-@keyframes alert-bounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-.reminder-alert-icon {
+.alert-icon {
   font-size: 48px;
-  margin-bottom: 12px;
-  animation: alert-ring 1s ease infinite;
+  margin-bottom: 16px;
 }
 
-@keyframes alert-ring {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-15deg); }
-  75% { transform: rotate(15deg); }
+.alert-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #fa8c16;
 }
 
-.reminder-alert-title {
+.alert-body {
+  margin-bottom: 20px;
+}
+
+.alert-stock {
   font-size: 18px;
   font-weight: 600;
-  color: var(--warning);
   margin-bottom: 8px;
 }
 
-.reminder-alert-text {
-  font-size: 16px;
-  color: var(--text);
-  margin-bottom: 24px;
-  line-height: 1.5;
-}
-
-.reminder-alert-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.dismiss-btn {
-  padding: 12px 24px;
-  background: var(--bg);
-  color: var(--text);
-  border: none;
-  border-radius: 24px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.view-btn {
-  padding: 12px 24px;
-  background: var(--primary);
-  color: white;
-  border: none;
-  border-radius: 24px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-/* Toast */
-.toast {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 12px 24px;
-  background: var(--text);
-  color: white;
-  border-radius: 24px;
+.alert-price {
   font-size: 14px;
-  z-index: 500;
-  opacity: 1;
-  transition: opacity 0.3s;
+  margin-bottom: 4px;
 }
 
-.toast.hidden {
-  opacity: 0;
-  pointer-events: none;
+.alert-price strong {
+  font-size: 24px;
+  color: #f54545;
 }
 
-.toast.success {
-  background: var(--success);
+.alert-target {
+  font-size: 12px;
+  color: #666;
 }
 
-.toast.error {
-  background: var(--danger);
+.alert-note {
+  font-size: 12px;
+  color: #999;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  margin-top: 8px;
 }
 
-.toast.info {
-  background: var(--primary);
+.alert-actions {
+  display: flex;
+  gap: 8px;
 }
 
-/* 响应式 */
+.alert-actions .btn-cancel {
+  border-color: #fa8c16;
+  color: #fa8c16;
+}
+
+.alert-actions .btn-confirm {
+  background: #fa8c16;
+}
+
+/* ==================== 响应式适配 ==================== */
 @media (min-width: 768px) {
-  .modal-content {
-    max-width: 500px;
-    margin: 0 auto;
-    bottom: 50%;
-    transform: translateY(50%);
-    border-radius: 16px;
+  .kline-container {
+    height: 400px;
   }
   
-  .calendar-content {
-    max-width: 500px;
-    margin: 0 auto;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .more-content {
-    max-width: 500px;
-    margin: 0 auto;
-    left: 50%;
-    transform: translateX(-50%);
+  .favorites-section {
+    max-width: 800px;
+    margin: 16px auto;
   }
 }
 
-/* 暗色模式支持 */
+@media (max-width: 375px) {
+  .header-title h1 {
+    font-size: 16px;
+  }
+  
+  .current-price {
+    font-size: 24px;
+  }
+  
+  .action-buttons {
+    flex-wrap: wrap;
+  }
+  
+  .action-btn {
+    min-width: calc(50% - 4px);
+  }
+}
+
+/* ==================== 深色模式（可选） ==================== */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1a1a1a;
-    --card: #2d2d2d;
-    --text: #ffffff;
-    --text-light: #888888;
-    --border: #404040;
-    --marked-bg: #3d3520;
-  }
+  /* 可根据需要添加深色模式样式 */
 }
 
-/* 安全区域适配 */
+/* ==================== 安全区域适配（iOS） ==================== */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .modal-content,
-  .calendar-content,
-  .more-content {
-    padding-bottom: calc(20px + env(safe-area-inset-bottom));
-  }
-  
-  .reminder-alert-content {
-    margin-bottom: env(safe-area-inset-bottom);
+  .favorites-section {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
   }
 }

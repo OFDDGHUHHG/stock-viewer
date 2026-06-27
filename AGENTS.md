@@ -1,23 +1,31 @@
-# 智能记事本 - 项目文档 v2
+# 股票看盘应用 - 项目文档
 
 ## 项目概述
 
-智能记事本是一款支持离线使用的笔记应用，能够自动解析文本中的时间信息并设置提醒。
+股票看盘是一款基于Web技术的股票行情查看应用，支持K线图、自选股管理、价格提醒等功能。
 
-## 新增功能
+## 功能特性
 
-- ⭐ 标记功能：点击星星标记重要记录，标记后黄色高亮并置顶
-- 📅 日期筛选：点击日历图标选择日期，显示当天所有记录
-- 📥 导入导出：支持JSON格式导入导出所有记录
-- 🔔 到时提醒：闹钟式提醒，到时间播放音效+振动+弹窗提醒
+### 核心功能
+- 📈 **K线图**：日K、周K、月K三种周期，Canvas绘制
+- 💹 **实时行情**：股票价格、涨跌幅实时更新
+- ⭐ **自选股**：添加、删除、管理关注的股票
+- 🔍 **股票搜索**：按代码或名称搜索
+- 🔔 **价格提醒**：设置目标价格，触发时弹窗+通知
+
+### 数据源
+- 模拟数据（演示用）
+- 东方财富API（非官方，可能不稳定）
+- 新浪财经API（非官方，可能不稳定）
 
 ## 技术栈
 
-- **前端框架**: 原生 JavaScript (ES6+)
-- **本地存储**: IndexedDB (v2)
-- **样式**: 纯 CSS (移动端优先)
-- **PWA支持**: Service Worker + Web App Manifest
-- **通知**: Web Notification API + AudioContext 音效
+- **前端**: 原生 JavaScript (ES6+)
+- **图表**: Canvas 2D
+- **存储**: IndexedDB
+- **样式**: CSS3 (移动端优先)
+- **PWA**: Service Worker + Web App Manifest
+- **通知**: Web Notification API
 
 ## 目录结构
 
@@ -26,58 +34,24 @@
 ├── index.html          # 主HTML页面
 ├── manifest.json       # PWA应用配置
 ├── sw.js               # Service Worker (离线支持)
-├── capacitor.config.json # Capacitor配置 (用于打包APK)
+├── capacitor.config.json # Capacitor配置 (APK打包)
 ├── styles/
 │   └── main.css        # 主样式文件
 ├── js/
 │   └── app.js          # 主应用逻辑
 └── icons/
-│   ├── icon-72.svg     # 应用图标
-│   ├── icon-192.svg
-│   └── icon-512.svg
+    ├── icon-72.svg     # 应用图标
+    ├── icon-192.svg
+    └── icon-512.svg
 ```
-
-## 功能模块
-
-### 1. IndexedDB 存储 (`NoteDB` 类)
-- 笔记增删改查
-- 提醒队列管理
-- 搜索功能
-- 日期筛选
-- 导入导出
-- 标记索引（v2新增）
-
-### 2. 时间解析器 (`TimeParser` 类)
-支持解析以下格式：
-- 相对时间: "2小时后"、"30分钟后"
-- 日期关键词: "明天"、"后天"
-- 星期: "周五"、"星期一"
-- 时段: "上午"、"下午"、"晚上"
-- 具体时间: "8点"、"下午3点半"
-- 组合: "明天8点开会"、"周五下午3点"
-
-### 3. 提醒闹钟系统 (`ReminderManager` 类)
-- 每10秒检查提醒队列
-- 到时播放音效（AudioContext）
-- 振动提醒（Vibration API）
-- 弹窗提醒界面
-- Web Notification通知
-
-### 4. 应用核心 (`App` 类)
-- UI 状态管理
-- 事件绑定
-- 笔记列表渲染（标记置顶）
-- 日历日期筛选
-- 导入导出功能
 
 ## 使用说明
 
 ### 在浏览器中使用 (PWA)
 1. 访问应用URL
-2. 添加笔记时输入如 "明天8点开会"
-3. 系统自动识别时间，点击"启用"开启提醒
-4. 允许通知权限以接收提醒
-5. 点击星星图标标记重要记录
+2. 搜索添加感兴趣的股票到自选股
+3. 点击股票查看K线图
+4. 设置价格提醒，到价时会通知
 
 ### 添加到手机主屏幕
 - **Android**: Chrome浏览器菜单 → "添加到主屏幕"
@@ -112,8 +86,8 @@ jobs:
       - name: Install Capacitor
         run: |
           npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "智能记事本" "com.smartnotes.app" --web-dir="./"
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications
+          npx cap init "股票看盘" "com.stockapp.viewer" --web-dir="./"
       
       - name: Add Android Platform
         run: npx cap add android
@@ -130,7 +104,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
-          name: smart-notes-apk
+          name: stock-app-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -150,8 +124,8 @@ jobs:
 npm init -y
 npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications
 
-# 2. 初始化Capacitor
-npx cap init "智能记事本" "com.smartnotes.app" --web-dir="./"
+# 2. 初始化Capacitor（已有配置文件可跳过）
+npx cap init "股票看盘" "com.stockapp.viewer" --web-dir="./"
 
 # 3. 添加Android平台
 npx cap add android
@@ -167,26 +141,30 @@ npx cap open android
 - Build → Build Bundle(s) / APK(s) → Build APK(s)
 - APK生成在 `android/app/build/outputs/apk/debug/`
 
-## 系统闹钟扩展
+## 注意事项
 
-Web应用使用浏览器通知+音效提醒。如需真正的系统闹钟，需要添加原生代码：
+1. **API可用性**: 免费股票API可能不稳定或被限制，建议使用模拟数据演示
+2. **通知权限**: 用户需要手动授权通知权限
+3. **数据实时性**: Web应用只能通过浏览器通知，无法像原生App那样后台运行
+4. **价格提醒**: 需要浏览器运行时才能检测价格触发提醒
+5. **跨域问题**: 调用外部API可能遇到CORS限制
 
-### 使用 Capacitor LocalNotifications
+## 扩展建议
+
+### 使用 Capacitor LocalNotifications 实现系统提醒
 
 ```javascript
-// 在app.js中添加
 import { LocalNotifications } from '@capacitor/local-notifications';
 
-// 在ReminderManager.triggerReminder中调用
-async scheduleSystemAlarm(note) {
+// 在价格触发时调用
+async scheduleNotification(reminder, currentPrice) {
   await LocalNotifications.schedule({
     notifications: [{
-      title: '智能记事本提醒',
-      body: note.content,
-      id: note.id,
-      schedule: { at: new Date(note.reminderTime) },
-      sound: undefined, // 使用系统默认声音
-      channelId: 'reminders',
+      title: '股价提醒',
+      body: `${reminder.name} 当前价格 ${currentPrice}`,
+      id: reminder.id,
+      sound: 'beep.mp3',
+      channelId: 'price-alerts',
     }]
   });
 }
@@ -198,16 +176,22 @@ async scheduleSystemAlarm(note) {
   "plugins": {
     "LocalNotifications": {
       "smallIcon": "ic_stat_alarm",
-      "iconColor": "#2563eb"
+      "iconColor": "#1890ff"
     }
   }
 }
 ```
 
-## 注意事项
+## API接口说明
 
-1. **离线运行**: Service Worker 缓存所有静态资源，IndexedDB 存储数据
-2. **通知权限**: 用户需要手动授权通知权限
-3. **浏览器提醒**: 关闭浏览器后无法触发通知，建议打包为 APK
-4. **数据安全**: 所有数据存储在本地，不上传服务器
-5. **导入导出**: 导出为JSON文件，可跨设备迁移数据
+### 搜索股票
+- 东方财富: `https://searchapi.eastmoney.com/bussiness/web/QuotationLabelSearch?keyword=茅台`
+- 返回格式: JSON数组，包含代码、名称、市场
+
+### 实时行情
+- 新浪财经: `https://hq.sinajs.cn/list=sh600519`
+- 返回格式: 字符串，需手动解析
+
+### K线数据
+- 东方财富: `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.600519&klt=101&lmt=60`
+- 返回格式: JSON，包含日期、开、收、高、低、量

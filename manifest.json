@@ -1,33 +1,28 @@
 {
-  "name": "智能记事本",
-  "short_name": "记事本",
-  "description": "智能记事本 - 自动解析提醒时间，本地存储笔记",
+  "name": "股票看盘",
+  "short_name": "股票",
+  "description": "实时股票行情查看应用，支持K线图、自选股、价格提醒",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#2563eb",
-  "theme_color": "#2563eb",
+  "background_color": "#f5f5f5",
+  "theme_color": "#1890ff",
   "icons": [
     {
-      "src": "/icons/icon-72.svg",
+      "src": "icons/icon-72.svg",
       "sizes": "72x72",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/svg+xml"
     },
     {
-      "src": "/icons/icon-192.svg",
+      "src": "icons/icon-192.svg",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/svg+xml"
     },
     {
-      "src": "/icons/icon-512.svg",
+      "src": "icons/icon-512.svg",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/svg+xml"
     }
   ],
-  "categories": ["utilities", "productivity"],
-  "lang": "zh-CN",
-  "prefer_related_applications": false
+  "categories": ["finance", "business"]
 }

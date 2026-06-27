@@ -1,1165 +1,1172 @@
 /**
- * 智能记事本 - 主应用逻辑 v2
- * 新功能：提醒标记置顶、日期筛选、导入导出、到时闹钟提醒
+ * 股票应用核心逻辑
+ * 功能：自选股管理、K线图、实时行情、搜索、价格提醒
  */
 
-(function() {
-  'use strict';
+// ==================== 常量定义 ====================
+const DB_NAME = 'StockAppDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'favorites';
+const REMINDER_STORE = 'reminders';
 
-  /* ============================================
-     IndexedDB 本地存储层
-     ============================================ */
-  class NoteDB {
-    constructor() {
-      this.dbName = 'SmartNotesDB';
-      this.dbVersion = 2; // 升级版本支持新字段
-      this.db = null;
-    }
+// 模拟股票数据（演示用）
+const MOCK_STOCKS = [
+  { code: '600519', name: '贵州茅台', market: 'sh', price: 1688.00, change: 12.50, changePercent: 0.74 },
+  { code: '000858', name: '五粮液', market: 'sz', price: 156.32, change: -2.18, changePercent: -1.38 },
+  { code: '600036', name: '招商银行', market: 'sh', price: 32.45, change: 0.35, changePercent: 1.08 },
+  { code: '000001', name: '平安银行', market: 'sz', price: 11.28, change: -0.15, changePercent: -1.31 },
+  { code: '601318', name: '中国平安', market: 'sh', price: 45.68, change: 1.23, changePercent: 2.71 },
+  { code: '000333', name: '美的集团', market: 'sz', price: 58.90, change: 0.82, changePercent: 1.41 },
+  { code: '002594', name: '比亚迪', market: 'sz', price: 245.60, change: 8.35, changePercent: 3.51 },
+  { code: '300750', name: '宁德时代', market: 'sz', price: 178.45, change: -5.62, changePercent: -3.03 },
+  { code: 'AAPL', name: '苹果', market: 'us', price: 178.72, change: 2.35, changePercent: 1.32 },
+  { code: 'TSLA', name: '特斯拉', market: 'us', price: 245.80, change: -8.45, changePercent: -3.32 },
+];
 
-    async init() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(this.dbName, this.dbVersion);
+// 生成模拟K线数据
+function generateKlineData(basePrice, days = 60) {
+  const data = [];
+  let price = basePrice;
+  const now = new Date();
+  
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    // 随机波动
+    const volatility = 0.03;
+    const change = (Math.random() - 0.5) * 2 * volatility;
+    const open = price;
+    const close = price * (1 + change);
+    const high = Math.max(open, close) * (1 + Math.random() * 0.01);
+    const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+    const volume = Math.floor(Math.random() * 10000000 + 1000000);
+    
+    data.push({
+      date: date.toISOString().split('T')[0],
+      open: Math.round(open * 100) / 100,
+      close: Math.round(close * 100) / 100,
+      high: Math.round(high * 100) / 100,
+      low: Math.round(low * 100) / 100,
+      volume
+    });
+    
+    price = close;
+  }
+  
+  return data;
+}
+
+// ==================== IndexedDB 存储 ====================
+class StockDB {
+  constructor() {
+    this.db = null;
+  }
+
+  async init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve();
+      };
+      
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
         
-        request.onerror = () => reject(request.error);
+        // 自选股存储
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'code' });
+        }
         
-        request.onupgradeneeded = (e) => {
-          const db = e.target.result;
-          // 笔记存储
-          if (!db.objectStoreNames.contains('notes')) {
-            const notesStore = db.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
-            notesStore.createIndex('content', 'content', { unique: false });
-            notesStore.createIndex('reminderTime', 'reminderTime', { unique: false });
-            notesStore.createIndex('createdAt', 'createdAt', { unique: false });
-            notesStore.createIndex('marked', 'marked', { unique: false }); // 新增：标记索引
-            notesStore.createIndex('date', 'date', { unique: false }); // 新增：日期索引
-          } else {
-            // 版本升级：添加新索引
-            const notesStore = e.target.transaction.objectStore('notes');
-            if (!notesStore.indexNames.contains('marked')) {
-              notesStore.createIndex('marked', 'marked', { unique: false });
-            }
-            if (!notesStore.indexNames.contains('date')) {
-              notesStore.createIndex('date', 'date', { unique: false });
-            }
-          }
-        };
-        
-        request.onsuccess = (e) => {
-          this.db = e.target.result;
-          resolve(this.db);
-        };
-      });
-    }
+        // 提醒存储
+        if (!db.objectStoreNames.contains(REMINDER_STORE)) {
+          const store = db.createObjectStore(REMINDER_STORE, { keyPath: 'id' });
+          store.createIndex('code', 'code', { unique: false });
+        }
+      };
+    });
+  }
 
-    async addNote(note) {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readwrite');
-        const store = tx.objectStore('notes');
-        const request = store.add(note);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
+  async getAllFavorites() {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
 
-    async updateNote(note) {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readwrite');
-        const store = tx.objectStore('notes');
-        const request = store.put(note);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
+  async addFavorite(stock) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put(stock);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
 
-    async deleteNote(id) {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readwrite');
-        const store = tx.objectStore('notes');
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    }
+  async removeFavorite(code) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.delete(code);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
 
-    async getNote(id) {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readonly');
-        const store = tx.objectStore('notes');
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
+  async isFavorite(code) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(code);
+      
+      request.onsuccess = () => resolve(request.result !== undefined);
+      request.onerror = () => reject(request.error);
+    });
+  }
 
-    async getAllNotes() {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readonly');
-        const store = tx.objectStore('notes');
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
+  async getAllReminders() {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(REMINDER_STORE, 'readonly');
+      const store = tx.objectStore(REMINDER_STORE);
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
 
-    async searchNotes(keyword) {
-      const allNotes = await this.getAllNotes();
-      const lower = keyword.toLowerCase();
-      return allNotes.filter(note => 
-        note.content.toLowerCase().includes(lower)
+  async addReminder(reminder) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(REMINDER_STORE, 'readwrite');
+      const store = tx.objectStore(REMINDER_STORE);
+      reminder.id = Date.now();
+      const request = store.put(reminder);
+      
+      request.onsuccess = () => resolve(reminder);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async removeReminder(id) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(REMINDER_STORE, 'readwrite');
+      const store = tx.objectStore(REMINDER_STORE);
+      const request = store.delete(id);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+}
+
+// ==================== 股票数据API ====================
+class StockAPI {
+  constructor() {
+    this.useMockData = true; // 默认使用模拟数据
+    this.apiType = 'mock'; // 'mock', 'sina', 'eastmoney'
+  }
+
+  // 搜索股票
+  async searchStocks(keyword) {
+    if (this.useMockData) {
+      return MOCK_STOCKS.filter(s => 
+        s.code.includes(keyword) || s.name.includes(keyword)
       );
     }
-
-    // 新增：按日期筛选
-    async getNotesByDate(dateStr) {
-      const allNotes = await this.getAllNotes();
-      return allNotes.filter(note => {
-        if (!note.createdAt) return false;
-        const noteDate = new Date(note.createdAt).toLocaleDateString('zh-CN');
-        return noteDate === dateStr;
-      });
-    }
-
-    async getPendingReminders() {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readonly');
-        const store = tx.objectStore('notes');
-        const index = store.index('reminderTime');
-        const request = index.getAll();
-        request.onsuccess = () => {
-          const now = Date.now();
-          const pending = request.result.filter(n => 
-            n.reminderTime && n.reminderEnabled && n.reminderTime > now
-          );
-          resolve(pending);
-        };
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    // 新增：清空所有数据
-    async clearAll() {
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction('notes', 'readwrite');
-        const store = tx.objectStore('notes');
-        const request = store.clear();
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    // 新增：批量导入
-    async importNotes(notes) {
-      for (const note of notes) {
-        // 移除id以避免冲突
-        const noteData = { ...note };
-        delete noteData.id;
-        noteData.createdAt = note.createdAt || Date.now();
-        noteData.updatedAt = Date.now();
-        await this.addNote(noteData);
-      }
+    
+    // 真实API搜索（需用户自行测试可用性）
+    try {
+      // 东方财富搜索API
+      const url = `https://searchapi.eastmoney.com/bussiness/web/QuotationLabelSearch?keyword=${encodeURIComponent(keyword)}&type=`;
+      const response = await fetch(url);
+      const data = await response.json();
+      return data.Data?.map(item => ({
+        code: item.Code,
+        name: item.Name,
+        market: item.Market === 1 ? 'sh' : 'sz'
+      })) || [];
+    } catch (e) {
+      console.error('搜索失败，使用模拟数据:', e);
+      return MOCK_STOCKS.filter(s => 
+        s.code.includes(keyword) || s.name.includes(keyword)
+      );
     }
   }
 
-  /* ============================================
-     智能时间解析器
-     支持格式：明天8点、后天下午3点、周五上午10点、2小时后等
-     ============================================ */
-  class TimeParser {
-    constructor() {
-      this.dayKeywords = {
-        '今天': 0,
-        '明日': 1, '明天': 1,
-        '后天': 2,
-        '大后天': 3,
-      };
-      
-      this.weekdayKeywords = {
-        '周一': 1, '星期一': 1, '礼拜一': 1,
-        '周二': 2, '星期二': 2, '礼拜二': 2,
-        '周三': 3, '星期三': 3, '礼拜三': 3,
-        '周四': 4, '星期四': 4, '礼拜四': 4,
-        '周五': 5, '星期五': 5, '礼拜五': 5,
-        '周六': 6, '星期六': 6, '礼拜六': 6,
-        '周日': 0, '星期日': 0, '礼拜日': 0, '星期天': 0,
-      };
-
-      this.periodKeywords = {
-        '上午': { start: 8, end: 12 },
-        '早上': { start: 6, end: 9 },
-        '早晨': { start: 6, end: 9 },
-        '中午': { start: 11, end: 14 },
-        '下午': { start: 13, end: 18 },
-        '傍晚': { start: 17, end: 19 },
-        '晚上': { start: 18, end: 22 },
-        '夜间': { start: 21, end: 24 },
-        '深夜': { start: 0, end: 5 },
-      };
-    }
-
-    parse(text) {
-      const now = new Date();
-      let parsedTime = null;
-      let matchedText = '';
-
-      // 1. 相对时间：X小时后、X分钟后
-      const relativeMatch = text.match(/(\d+)\s*(小时|分钟|秒)[之以]?后/);
-      if (relativeMatch) {
-        const amount = parseInt(relativeMatch[1]);
-        const unit = relativeMatch[2];
-        matchedText = relativeMatch[0];
-        
-        if (unit === '小时') {
-          parsedTime = new Date(now.getTime() + amount * 3600 * 1000);
-        } else if (unit === '分钟') {
-          parsedTime = new Date(now.getTime() + amount * 60 * 1000);
-        } else if (unit === '秒') {
-          parsedTime = new Date(now.getTime() + amount * 1000);
-        }
-      }
-
-      // 2. 星期 + 时间：周五下午3点
-      if (!parsedTime) {
-        for (const [keyword, weekday] of Object.entries(this.weekdayKeywords)) {
-          if (text.includes(keyword)) {
-            const targetDate = this.getNextWeekday(now, weekday);
-            const periodTime = this.extractPeriodAndHour(text, keyword);
-            
-            if (periodTime) {
-              targetDate.setHours(periodTime.hour, periodTime.minute || 0, 0, 0);
-              parsedTime = targetDate;
-              matchedText = keyword + (periodTime.text || '');
-            }
-            break;
-          }
-        }
-      }
-
-      // 3. 日期关键词 + 时间：明天8点
-      if (!parsedTime) {
-        for (const [keyword, dayOffset] of Object.entries(this.dayKeywords)) {
-          if (text.includes(keyword)) {
-            const targetDate = new Date(now);
-            targetDate.setDate(targetDate.getDate() + dayOffset);
-            
-            const periodTime = this.extractPeriodAndHour(text, keyword);
-            if (periodTime) {
-              targetDate.setHours(periodTime.hour, periodTime.minute || 0, 0, 0);
-              parsedTime = targetDate;
-              matchedText = keyword + (periodTime.text || '');
-            } else {
-              targetDate.setHours(9, 0, 0, 0);
-              parsedTime = targetDate;
-              matchedText = keyword;
-            }
-            break;
-          }
-        }
-      }
-
-      // 4. 具体日期：1月15日
-      if (!parsedTime) {
-        const dateMatch = text.match(/(\d{1,2})[月月]\s*(\d{1,2})[号日]?/);
-        if (dateMatch) {
-          const month = parseInt(dateMatch[1]) - 1;
-          const day = parseInt(dateMatch[2]);
-          const targetDate = new Date(now.getFullYear(), month, day);
-          
-          if (targetDate < now) {
-            targetDate.setFullYear(targetDate.getFullYear() + 1);
-          }
-          
-          const periodTime = this.extractPeriodAndHour(text, dateMatch[0]);
-          if (periodTime) {
-            targetDate.setHours(periodTime.hour, periodTime.minute || 0, 0, 0);
-          } else {
-            targetDate.setHours(9, 0, 0, 0);
-          }
-          
-          parsedTime = targetDate;
-          matchedText = dateMatch[0];
-        }
-      }
-
-      // 5. 单独时间：8点、下午3点半
-      if (!parsedTime) {
-        const periodTime = this.extractPeriodAndHour(text, '');
-        if (periodTime) {
-          const targetDate = new Date(now);
-          targetDate.setHours(periodTime.hour, periodTime.minute || 0, 0, 0);
-          
-          if (targetDate <= now) {
-            targetDate.setDate(targetDate.getDate() + 1);
-          }
-          
-          parsedTime = targetDate;
-          matchedText = periodTime.text;
-        }
-      }
-
-      if (parsedTime && parsedTime > now) {
+  // 获取实时行情
+  async getQuote(code, market) {
+    if (this.useMockData) {
+      const stock = MOCK_STOCKS.find(s => s.code === code);
+      if (stock) {
+        // 添加随机波动模拟实时更新
+        const volatility = 0.001;
+        const change = (Math.random() - 0.5) * 2 * volatility * stock.price;
         return {
-          time: parsedTime,
-          text: matchedText.trim(),
-          display: this.formatDisplay(parsedTime)
+          ...stock,
+          price: Math.round((stock.price + change) * 100) / 100,
+          time: new Date().toLocaleTimeString()
         };
       }
-      
       return null;
     }
 
-    extractPeriodAndHour(text, afterKeyword) {
-      const searchStart = afterKeyword ? text.indexOf(afterKeyword) + afterKeyword.length : 0;
-      const searchText = text.slice(searchStart);
+    // 新浪财经API（非官方，可能不稳定）
+    try {
+      const symbol = market === 'us' ? code : `${market}${code}`;
+      const url = `https://hq.sinajs.cn/list=${symbol}`;
+      const response = await fetch(url);
+      const text = await response.text();
       
-      let hour = null;
-      let minute = 0;
-      let periodText = '';
-
-      let period = null;
-      for (const [keyword, range] of Object.entries(this.periodKeywords)) {
-        if (searchText.includes(keyword)) {
-          period = range;
-          periodText = keyword;
-          break;
+      // 解析返回数据
+      const match = text.match(/="([^"]+)"/);
+      if (match) {
+        const parts = match[1].split(',');
+        if (parts.length > 30) {
+          return {
+            code,
+            name: parts[0],
+            price: parseFloat(parts[3]),
+            open: parseFloat(parts[1]),
+            high: parseFloat(parts[4]),
+            low: parseFloat(parts[5]),
+            volume: parseInt(parts[8]),
+            change: parseFloat(parts[3]) - parseFloat(parts[2]),
+            changePercent: ((parseFloat(parts[3]) - parseFloat(parts[2])) / parseFloat(parts[2]) * 100).toFixed(2),
+            time: parts[31]
+          };
         }
       }
-
-      const timeMatch = searchText.match(/(\d{1,2})[点时:：]\s*(\d{1,2}|半)?/);
-      if (timeMatch) {
-        hour = parseInt(timeMatch[1]);
-        if (timeMatch[2]) {
-          if (timeMatch[2] === '半') {
-            minute = 30;
-          } else {
-            minute = parseInt(timeMatch[2]);
-          }
-        }
-        periodText += timeMatch[0];
-        
-        if (period && hour < 12 && period.start >= 12) {
-          hour += 12;
-        }
-      }
-
-      if (hour !== null && hour >= 0 && hour < 24) {
-        return { hour, minute, text: periodText };
-      }
-      
-      if (period) {
-        return { hour: period.start, minute: 0, text: periodText };
-      }
-      
       return null;
-    }
-
-    getNextWeekday(now, targetWeekday) {
-      const currentWeekday = now.getDay();
-      let daysUntil = targetWeekday - currentWeekday;
-      if (daysUntil <= 0) daysUntil += 7;
-      const targetDate = new Date(now);
-      targetDate.setDate(targetDate.getDate() + daysUntil);
-      return targetDate;
-    }
-
-    formatDisplay(date) {
-      const now = new Date();
-      const diffDays = Math.floor((date - now) / (24 * 3600 * 1000));
-      
-      const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-      const hour = date.getHours();
-      const minute = date.getMinutes();
-      const timeStr = `${hour}:${minute.toString().padStart(2, '0')}`;
-      
-      let dayStr = '';
-      if (diffDays === 0) dayStr = '今天';
-      else if (diffDays === 1) dayStr = '明天';
-      else if (diffDays === 2) dayStr = '后天';
-      else dayStr = weekdays[date.getDay()];
-      
-      return `${dayStr} ${timeStr}`;
+    } catch (e) {
+      console.error('获取行情失败:', e);
+      return null;
     }
   }
 
-  /* ============================================
-     提醒闹钟系统 - 到时响铃提醒
-     ============================================ */
-  class ReminderManager {
-    constructor(db, app) {
-      this.db = db;
-      this.app = app;
-      this.checkInterval = null;
-      this.permissionGranted = false;
-      this.activeReminders = new Map(); // 正在提醒的笔记
-      this.audioContext = null;
+  // 获取K线数据
+  async getKlineData(code, market, period = 'day') {
+    if (this.useMockData) {
+      const stock = MOCK_STOCKS.find(s => s.code === code);
+      if (stock) {
+        return generateKlineData(stock.price, 60);
+      }
+      return generateKlineData(100, 60);
     }
 
-    async requestPermission() {
-      if (!('Notification' in window)) {
-        return false;
-      }
+    // 东方财富K线API
+    try {
+      const secid = market === 'us' ? `105.${code}` : (market === 'sh' ? `1.${code}` : `0.${code}`);
+      const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55,f56,f57&klt=${period === 'day' ? 101 : period === 'week' ? 102 : 103}&fqt=1&end=20500101&lmt=60`;
       
-      if (Notification.permission === 'granted') {
-        this.permissionGranted = true;
-        return true;
-      }
+      const response = await fetch(url);
+      const data = await response.json();
       
-      const result = await Notification.requestPermission();
-      this.permissionGranted = result === 'granted';
-      return this.permissionGranted;
+      if (data.data?.klines) {
+        return data.data.klines.map(line => {
+          const parts = line.split(',');
+          return {
+            date: parts[0],
+            open: parseFloat(parts[1]),
+            close: parseFloat(parts[2]),
+            high: parseFloat(parts[3]),
+            low: parseFloat(parts[4]),
+            volume: parseInt(parts[5]),
+            turnover: parseFloat(parts[6])
+          };
+        });
+      }
+      return null;
+    } catch (e) {
+      console.error('获取K线失败，使用模拟数据:', e);
+      const stock = MOCK_STOCKS.find(s => s.code === code);
+      return generateKlineData(stock?.price || 100, 60);
     }
+  }
 
-    startChecking() {
-      // 每10秒检查一次（更频繁的检查）
-      this.checkInterval = setInterval(() => this.checkReminders(), 10000);
-      this.checkReminders();
+  // 切换数据源
+  setDataSource(type) {
+    this.apiType = type;
+    this.useMockData = type === 'mock';
+  }
+}
+
+// ==================== K线图绘制引擎 ====================
+class KlineChart {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.data = [];
+    this.options = {
+      upColor: '#f54545',    // 上涨红色
+      downColor: '#0f0f0f',  // 下跌黑色（或绿色）
+      gridColor: '#e0e0e0',
+      textColor: '#666',
+      bgColor: '#fff',
+      showVolume: true,
+      showMA: true,
+      maLines: [5, 10, 20]
+    };
+    this.viewport = {
+      startIndex: 0,
+      endIndex: 60,
+      candleWidth: 8
+    };
+    this.selectedCandle = null;
+    
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    
+    // 绑定交互事件
+    this.bindEvents();
+  }
+
+  resize() {
+    const container = this.canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    
+    // 设置canvas实际像素大小
+    this.canvas.width = rect.width * window.devicePixelRatio;
+    this.canvas.height = rect.height * window.devicePixelRatio;
+    
+    // 设置CSS显示大小
+    this.canvas.style.width = rect.width + 'px';
+    this.canvas.style.height = rect.height + 'px';
+    
+    this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    
+    this.width = rect.width;
+    this.height = rect.height;
+    
+    if (this.data.length > 0) {
+      this.draw();
+    }
+  }
+
+  setData(data) {
+    this.data = data;
+    this.viewport.endIndex = Math.min(data.length, 60);
+    this.viewport.startIndex = Math.max(0, this.viewport.endIndex - 60);
+    this.draw();
+  }
+
+  bindEvents() {
+    // 触摸/鼠标移动显示详情
+    this.canvas.addEventListener('mousemove', (e) => this.handleMove(e));
+    this.canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      this.handleMove({ clientX: touch.clientX, clientY: touch.clientY });
+    });
+    
+    // 滚动/滑动切换视图
+    this.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.handleScroll(e.deltaY > 0 ? 1 : -1);
+    });
+    
+    let touchStartX = 0;
+    this.canvas.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    });
+    this.canvas.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const delta = touchStartX - touchEndX;
+      if (Math.abs(delta) > 30) {
+        this.handleScroll(delta > 0 ? 5 : -5);
+      }
+    });
+  }
+
+  handleMove(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // 计算对应的蜡烛索引
+    const chartWidth = this.width - 60;
+    const candleCount = this.viewport.endIndex - this.viewport.startIndex;
+    const candleWidth = chartWidth / candleCount;
+    const index = Math.floor(x / candleWidth) + this.viewport.startIndex;
+    
+    if (index >= 0 && index < this.data.length) {
+      this.selectedCandle = this.data[index];
+      this.draw();
+      this.showTooltip(this.selectedCandle, x, y);
+    }
+  }
+
+  handleScroll(delta) {
+    const newIndex = this.viewport.startIndex + delta;
+    const maxStart = this.data.length - 20;
+    
+    if (newIndex >= 0 && newIndex <= maxStart) {
+      this.viewport.startIndex = newIndex;
+      this.viewport.endIndex = newIndex + Math.min(60, this.data.length - newIndex);
+      this.draw();
+    }
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    const { width, height } = this;
+    
+    // 清空画布
+    ctx.fillStyle = this.options.bgColor;
+    ctx.fillRect(0, 0, width, height);
+    
+    if (this.data.length === 0) {
+      ctx.fillStyle = '#999';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('暂无数据', width / 2, height / 2);
+      return;
+    }
+    
+    const dataSlice = this.data.slice(this.viewport.startIndex, this.viewport.endIndex);
+    
+    // 计算价格范围
+    const prices = dataSlice.flatMap(d => [d.high, d.low]);
+    let minPrice = Math.min(...prices);
+    let maxPrice = Math.max(...prices);
+    const priceRange = maxPrice - minPrice;
+    const padding = priceRange * 0.1;
+    minPrice -= padding;
+    maxPrice += padding;
+    
+    // 绘制区域划分
+    const priceAreaHeight = height * 0.7;
+    const volumeAreaHeight = height * 0.2;
+    const infoAreaHeight = height * 0.1;
+    
+    // 绘制网格
+    this.drawGrid(ctx, minPrice, maxPrice, priceAreaHeight, volumeAreaHeight);
+    
+    // 绘制K线蜡烛
+    this.drawCandles(ctx, dataSlice, minPrice, maxPrice, priceAreaHeight);
+    
+    // 绘制成交量
+    if (this.options.showVolume) {
+      this.drawVolume(ctx, dataSlice, volumeAreaHeight, priceAreaHeight);
+    }
+    
+    // 绘制均线
+    if (this.options.showMA) {
+      this.drawMA(ctx, dataSlice, minPrice, maxPrice, priceAreaHeight);
+    }
+    
+    // 绘制选中高亮
+    if (this.selectedCandle) {
+      this.drawHighlight(ctx, this.selectedCandle, minPrice, maxPrice, priceAreaHeight);
+    }
+  }
+
+  drawGrid(ctx, minPrice, maxPrice, priceHeight, volumeHeight) {
+    const { width, height } = this;
+    const chartWidth = width - 60;
+    
+    ctx.strokeStyle = this.options.gridColor;
+    ctx.lineWidth = 0.5;
+    
+    // 价格区域网格线
+    for (let i = 0; i <= 4; i++) {
+      const y = i * priceHeight / 4;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(chartWidth, y);
+      ctx.stroke();
       
-      // 页面可见时持续检查
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          this.checkReminders();
+      // 价格标签
+      const price = maxPrice - (maxPrice - minPrice) * i / 4;
+      ctx.fillStyle = this.options.textColor;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(price.toFixed(2), width - 5, y + 10);
+    }
+    
+    // 分割线
+    ctx.beginPath();
+    ctx.moveTo(0, priceHeight);
+    ctx.lineTo(chartWidth, priceHeight);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  drawCandles(ctx, data, minPrice, maxPrice, priceHeight) {
+    const { width } = this;
+    const chartWidth = width - 60;
+    const candleCount = data.length;
+    const candleWidth = chartWidth / candleCount;
+    const candleBodyWidth = candleWidth * 0.7;
+    
+    const priceScale = priceHeight / (maxPrice - minPrice);
+    
+    data.forEach((candle, i) => {
+      const x = i * candleWidth + candleWidth / 2;
+      const isUp = candle.close >= candle.open;
+      const color = isUp ? this.options.upColor : this.options.downColor;
+      
+      // 计算Y坐标
+      const openY = priceHeight - (candle.open - minPrice) * priceScale;
+      const closeY = priceHeight - (candle.close - minPrice) * priceScale;
+      const highY = priceHeight - (candle.high - minPrice) * priceScale;
+      const lowY = priceHeight - (candle.low - minPrice) * priceScale;
+      
+      // 绘制影线
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, highY);
+      ctx.lineTo(x, lowY);
+      ctx.stroke();
+      
+      // 绘制实体
+      ctx.fillStyle = color;
+      const bodyTop = Math.min(openY, closeY);
+      const bodyHeight = Math.abs(closeY - openY) || 1;
+      ctx.fillRect(x - candleBodyWidth / 2, bodyTop, candleBodyWidth, bodyHeight);
+    });
+  }
+
+  drawVolume(ctx, data, volumeHeight, priceHeight) {
+    const { width } = this;
+    const chartWidth = width - 60;
+    const candleCount = data.length;
+    const candleWidth = chartWidth / candleCount;
+    const barWidth = candleWidth * 0.7;
+    
+    const volumes = data.map(d => d.volume);
+    const maxVolume = Math.max(...volumes);
+    const volumeScale = volumeHeight / maxVolume;
+    
+    const volumeStartY = priceHeight + 5;
+    
+    data.forEach((candle, i) => {
+      const x = i * candleWidth + candleWidth / 2;
+      const isUp = candle.close >= candle.open;
+      const color = isUp ? this.options.upColor : this.options.downColor;
+      
+      const barHeight = candle.volume * volumeScale;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.5;
+      ctx.fillRect(x - barWidth / 2, volumeStartY + volumeHeight - barHeight, barWidth, barHeight);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  drawMA(ctx, data, minPrice, maxPrice, priceHeight) {
+    const { width } = this;
+    const chartWidth = width - 60;
+    const candleCount = data.length;
+    const candleWidth = chartWidth / candleCount;
+    
+    const priceScale = priceHeight / (maxPrice - minPrice);
+    const maColors = ['#ff6b6b', '#4ecdc4', '#45b7d1'];
+    
+    this.options.maLines.forEach((maPeriod, maIndex) => {
+      // 计算均线数据
+      const maData = [];
+      for (let i = 0; i < data.length; i++) {
+        if (i >= maPeriod - 1) {
+          const sum = data.slice(i - maPeriod + 1, i + 1).reduce((a, b) => a + b.close, 0);
+          maData.push(sum / maPeriod);
+        } else {
+          maData.push(null);
+        }
+      }
+      
+      // 绘制均线
+      ctx.strokeStyle = maColors[maIndex];
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      
+      let started = false;
+      maData.forEach((ma, i) => {
+        if (ma !== null) {
+          const x = i * candleWidth + candleWidth / 2;
+          const y = priceHeight - (ma - minPrice) * priceScale;
+          
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
         }
       });
-    }
-
-    stopChecking() {
-      if (this.checkInterval) {
-        clearInterval(this.checkInterval);
-        this.checkInterval = null;
-      }
-    }
-
-    async checkReminders() {
-      const pending = await this.db.getPendingReminders();
-      const now = Date.now();
       
-      for (const note of pending) {
-        // 提醒时间到了（前后30秒内）
-        if (note.reminderTime <= now + 30000 && note.reminderTime >= now - 30000) {
-          if (!this.activeReminders.has(note.id)) {
-            this.triggerReminder(note);
-          }
-        }
-      }
-    }
-
-    triggerReminder(note) {
-      this.activeReminders.set(note.id, true);
+      ctx.stroke();
       
-      // 播放提醒音
-      this.playAlarmSound();
-      
-      // 显示通知
-      if (this.permissionGranted) {
-        const notification = new Notification('智能记事本提醒', {
-          body: note.content,
-          icon: '/icons/icon-192.svg',
-          tag: `note-${note.id}`,
-          requireInteraction: true,
-          vibrate: [200, 100, 200, 100, 200], // 振动模式
-        });
-        
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-          this.stopAlarmSound();
-          this.app.editNote(note.id);
-        };
-        
-        notification.onclose = () => {
-          this.stopAlarmSound();
-        };
+      // 均线标签
+      const lastMa = maData[maData.length - 1];
+      if (lastMa) {
+        ctx.fillStyle = maColors[maIndex];
+        ctx.font = '10px sans-serif';
+        ctx.fillText(`MA${maPeriod}:${lastMa.toFixed(2)}`, chartWidth + 5, 20 + maIndex * 12);
       }
-      
-      // 显示应用内提醒弹窗
-      this.app.showReminderAlert(note);
-      
-      // 提醒后禁用
-      note.reminderEnabled = false;
-      note.reminderTriggered = true;
-      this.db.updateNote(note);
-      this.app.loadNotes();
-    }
-
-    // 播放闹钟音效
-    playAlarmSound() {
-      try {
-        if (!this.audioContext) {
-          this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        
-        // 创建简单的提醒音
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-        
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.5);
-        
-        oscillator.start(this.audioContext.currentTime);
-        oscillator.stop(this.audioContext.currentTime + 0.5);
-        
-        // 循环播放
-        this.alarmInterval = setInterval(() => {
-          if (this.audioContext) {
-            const osc = this.audioContext.createOscillator();
-            const gain = this.audioContext.createGain();
-            osc.connect(gain);
-            gain.connect(this.audioContext.destination);
-            osc.frequency.value = 800;
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.5);
-            osc.start(this.audioContext.currentTime);
-            osc.stop(this.audioContext.currentTime + 0.5);
-          }
-        }, 1000);
-        
-      } catch (e) {
-        console.log('无法播放音效:', e);
-      }
-    }
-
-    stopAlarmSound() {
-      if (this.alarmInterval) {
-        clearInterval(this.alarmInterval);
-        this.alarmInterval = null;
-      }
-    }
-
-    dismissReminder(noteId) {
-      this.activeReminders.delete(noteId);
-      this.stopAlarmSound();
-    }
+    });
   }
 
-  /* ============================================
-     主应用类
-     ============================================ */
-  class App {
-    constructor() {
-      this.db = new NoteDB();
-      this.parser = new TimeParser();
-      this.reminderManager = null;
-      this.notes = [];
-      this.currentNoteId = null;
-      this.searchKeyword = '';
-      this.filterDate = null; // 日期筛选
-      this.currentParsedTime = null;
-      
-      this.ui = {};
-      this.init();
-    }
+  drawHighlight(ctx, candle, minPrice, maxPrice, priceHeight) {
+    const index = this.data.indexOf(candle);
+    if (index < this.viewport.startIndex || index >= this.viewport.endIndex) return;
+    
+    const { width } = this;
+    const chartWidth = width - 60;
+    const dataSlice = this.data.slice(this.viewport.startIndex, this.viewport.endIndex);
+    const candleIndex = index - this.viewport.startIndex;
+    const candleWidth = chartWidth / dataSlice.length;
+    
+    const x = candleIndex * candleWidth + candleWidth / 2;
+    
+    // 高亮竖线
+    ctx.strokeStyle = '#1890ff';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, priceHeight);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
-    async init() {
-      await this.cacheUIElements();
+  showTooltip(candle, x, y) {
+    const tooltip = document.getElementById('klineTooltip');
+    if (!tooltip) return;
+    
+    const isUp = candle.close >= candle.open;
+    const change = (candle.close - candle.open).toFixed(2);
+    const changePercent = ((candle.close - candle.open) / candle.open * 100).toFixed(2);
+    
+    tooltip.innerHTML = `
+      <div class="tooltip-date">${candle.date}</div>
+      <div>开: ${candle.open.toFixed(2)} 高: ${candle.high.toFixed(2)}</div>
+      <div>收: ${candle.close.toFixed(2)} 低: ${candle.low.toFixed(2)}</div>
+      <div class="tooltip-change ${isUp ? 'up' : 'down'}">
+        涨跌: ${isUp ? '+' : ''}${change} (${isUp ? '+' : ''}${changePercent}%)
+      </div>
+      <div>成交量: ${(candle.volume / 10000).toFixed(0)}万</div>
+    `;
+    tooltip.style.display = 'block';
+  }
+}
+
+// ==================== 应用主类 ====================
+class StockApp {
+  constructor() {
+    this.db = new StockDB();
+    this.api = new StockAPI();
+    this.chart = null;
+    this.currentStock = null;
+    this.favorites = [];
+    this.reminders = [];
+    this.updateTimer = null;
+    
+    this.init();
+  }
+
+  async init() {
+    try {
+      // 初始化数据库
       await this.db.init();
       
-      this.reminderManager = new ReminderManager(this.db, this);
-      this.reminderManager.startChecking();
+      // 加载自选股
+      this.favorites = await this.db.getAllFavorites();
       
-      await this.loadNotes();
+      // 初始化K线图
+      this.chart = new KlineChart('klineCanvas');
+      
+      // 绑定事件
       this.bindEvents();
-      this.registerServiceWorker();
-      this.initCalendar();
-    }
-
-    async cacheUIElements() {
-      this.ui = {
-        noteList: document.getElementById('noteList'),
-        emptyState: document.getElementById('emptyState'),
-        searchBtn: document.getElementById('searchBtn'),
-        searchPanel: document.getElementById('searchPanel'),
-        searchInput: document.getElementById('searchInput'),
-        clearSearchBtn: document.getElementById('clearSearchBtn'),
-        closeSearchBtn: document.getElementById('closeSearchBtn'),
-        dateFilterBtn: document.getElementById('dateFilterBtn'),
-        calendarPanel: document.getElementById('calendarPanel'),
-        calendarGrid: document.getElementById('calendarGrid'),
-        calendarTitle: document.getElementById('calendarTitle'),
-        prevMonthBtn: document.getElementById('prevMonthBtn'),
-        nextMonthBtn: document.getElementById('nextMonthBtn'),
-        closeCalendarBtn: document.getElementById('closeCalendarBtn'),
-        clearDateFilterBtn: document.getElementById('clearDateFilterBtn'),
-        addBtn: document.getElementById('addBtn'),
-        moreBtn: document.getElementById('moreBtn'),
-        morePanel: document.getElementById('morePanel'),
-        exportBtn: document.getElementById('exportBtn'),
-        importBtn: document.getElementById('importBtn'),
-        importFile: document.getElementById('importFile'),
-        closeMoreBtn: document.getElementById('closeMoreBtn'),
-        editModal: document.getElementById('editModal'),
-        modalTitle: document.getElementById('modalTitle'),
-        noteContent: document.getElementById('noteContent'),
-        parsedReminder: document.getElementById('parsedReminder'),
-        reminderTime: document.getElementById('reminderTime'),
-        toggleReminderBtn: document.getElementById('toggleReminderBtn'),
-        toggleMarkBtn: document.getElementById('toggleMarkBtn'),
-        customTimeInput: document.getElementById('customTimeInput'),
-        setCustomBtn: document.getElementById('setCustomBtn'),
-        closeModalBtn: document.getElementById('closeModalBtn'),
-        saveNoteBtn: document.getElementById('saveNoteBtn'),
-        deleteNoteBtn: document.getElementById('deleteNoteBtn'),
-        toast: document.getElementById('toast'),
-        reminderModal: document.getElementById('reminderModal'),
-        requestNotifyBtn: document.getElementById('requestNotifyBtn'),
-        closeReminderModalBtn: document.getElementById('closeReminderModalBtn'),
-        reminderList: document.getElementById('reminderList'),
-        reminderAlert: document.getElementById('reminderAlert'),
-        reminderAlertContent: document.getElementById('reminderAlertContent'),
-        dismissReminderBtn: document.getElementById('dismissReminderBtn'),
-        viewReminderBtn: document.getElementById('viewReminderBtn'),
-      };
-    }
-
-    bindEvents() {
-      // 添加按钮
-      this.ui.addBtn.addEventListener('click', () => this.openModal(null));
       
-      // 搜索
-      this.ui.searchBtn.addEventListener('click', () => this.toggleSearch(true));
-      this.ui.closeSearchBtn.addEventListener('click', () => this.toggleSearch(false));
-      this.ui.searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
-      this.ui.clearSearchBtn.addEventListener('click', () => {
-        this.ui.searchInput.value = '';
-        this.handleSearch('');
+      // 渲染自选股列表
+      this.renderFavorites();
+      
+      // 请求通知权限
+      this.requestNotificationPermission();
+      
+      // 开始价格提醒检查
+      this.startReminderCheck();
+      
+      // 如果有自选股，显示第一个
+      if (this.favorites.length > 0) {
+        this.showStock(this.favorites[0]);
+      } else {
+        // 显示演示股票
+        this.showStock(MOCK_STOCKS[0]);
+      }
+      
+      // 开始实时更新
+      this.startRealtimeUpdate();
+      
+      console.log('股票应用初始化完成');
+    } catch (e) {
+      console.error('初始化失败:', e);
+    }
+  }
+
+  bindEvents() {
+    // 搜索输入
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
+    searchInput.addEventListener('focus', () => {
+      document.getElementById('searchResults').style.display = 'block';
+    });
+    
+    // 点击其他地方隐藏搜索结果
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-box')) {
+        document.getElementById('searchResults').style.display = 'none';
+      }
+    });
+    
+    // 添加自选股按钮
+    document.getElementById('addFavoriteBtn').addEventListener('click', () => {
+      if (this.currentStock) {
+        this.toggleFavorite(this.currentStock);
+      }
+    });
+    
+    // 设置提醒按钮
+    document.getElementById('setReminderBtn').addEventListener('click', () => {
+      if (this.currentStock) {
+        this.showReminderModal(this.currentStock);
+      }
+    });
+    
+    // K线周期切换
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.changePeriod(btn.dataset.period);
       });
-      
-      // 日期筛选
-      this.ui.dateFilterBtn.addEventListener('click', () => this.toggleCalendar(true));
-      this.ui.closeCalendarBtn.addEventListener('click', () => this.toggleCalendar(false));
-      this.ui.prevMonthBtn.addEventListener('click', () => this.changeMonth(-1));
-      this.ui.nextMonthBtn.addEventListener('click', () => this.changeMonth(1));
-      this.ui.clearDateFilterBtn.addEventListener('click', () => this.clearDateFilter());
-      
-      // 更多菜单（导入导出）
-      this.ui.moreBtn.addEventListener('click', () => this.toggleMoreMenu(true));
-      this.ui.closeMoreBtn.addEventListener('click', () => this.toggleMoreMenu(false));
-      this.ui.exportBtn.addEventListener('click', () => this.exportNotes());
-      this.ui.importBtn.addEventListener('click', () => this.ui.importFile.click());
-      this.ui.importFile.addEventListener('change', (e) => this.importNotes(e));
-      
-      // 编辑弹窗
-      this.ui.closeModalBtn.addEventListener('click', () => this.closeModal());
-      this.ui.noteContent.addEventListener('input', () => this.parseContent());
-      this.ui.toggleReminderBtn.addEventListener('click', () => this.toggleReminder());
-      this.ui.toggleMarkBtn.addEventListener('click', () => this.toggleMark());
-      this.ui.setCustomBtn.addEventListener('click', () => this.setCustomTime());
-      this.ui.saveNoteBtn.addEventListener('click', () => this.saveNote());
-      this.ui.deleteNoteBtn.addEventListener('click', () => this.deleteNote());
-      
-      // 点击遮罩关闭弹窗
-      this.ui.editModal.querySelector('.modal-backdrop').addEventListener('click', () => this.closeModal());
-      this.ui.calendarPanel.querySelector('.modal-backdrop').addEventListener('click', () => this.toggleCalendar(false));
-      this.ui.morePanel.querySelector('.modal-backdrop').addEventListener('click', () => this.toggleMoreMenu(false));
-      
-      // 提醒权限
-      this.ui.requestNotifyBtn.addEventListener('click', async () => {
-        const granted = await this.reminderManager.requestPermission();
-        if (granted) {
-          this.showToast('通知权限已开启', 'success');
-          this.ui.requestNotifyBtn.textContent = '已开启';
-          this.ui.requestNotifyBtn.disabled = true;
+    });
+    
+    // 数据源切换
+    document.getElementById('dataSourceSelect').addEventListener('change', (e) => {
+      this.api.setDataSource(e.target.value);
+      if (this.currentStock) {
+        this.refreshCurrentStock();
+      }
+    });
+    
+    // 提醒弹窗确认
+    document.getElementById('reminderConfirmBtn').addEventListener('click', () => {
+      this.saveReminder();
+    });
+    
+    document.getElementById('reminderCancelBtn').addEventListener('click', () => {
+      document.getElementById('reminderModal').style.display = 'none';
+    });
+    
+    // 提醒列表关闭
+    document.getElementById('closeReminderListBtn').addEventListener('click', () => {
+      document.getElementById('reminderListModal').style.display = 'none';
+    });
+    
+    // 查看提醒列表按钮
+    document.getElementById('viewRemindersBtn').addEventListener('click', () => {
+      this.showReminderList();
+    });
+  }
+
+  handleSearch(keyword) {
+    if (!keyword || keyword.length < 1) {
+      document.getElementById('searchResults').innerHTML = '';
+      return;
+    }
+    
+    this.api.searchStocks(keyword).then(results => {
+      this.renderSearchResults(results);
+    });
+  }
+
+  renderSearchResults(results) {
+    const container = document.getElementById('searchResults');
+    
+    if (results.length === 0) {
+      container.innerHTML = '<div class="search-empty">未找到相关股票</div>';
+      return;
+    }
+    
+    container.innerHTML = results.map(stock => `
+      <div class="search-item" data-code="${stock.code}" data-market="${stock.market || 'sh'}">
+        <span class="stock-code">${stock.code}</span>
+        <span class="stock-name">${stock.name}</span>
+        ${stock.price ? `<span class="stock-price ${stock.change >= 0 ? 'up' : 'down'}">${stock.price.toFixed(2)}</span>` : ''}
+      </div>
+    `).join('');
+    
+    // 绑定点击事件
+    container.querySelectorAll('.search-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const code = item.dataset.code;
+        const market = item.dataset.market;
+        const stock = results.find(s => s.code === code);
+        this.showStock(stock);
+        container.style.display = 'none';
+        document.getElementById('searchInput').value = '';
+      });
+    });
+  }
+
+  async showStock(stock) {
+    this.currentStock = stock;
+    
+    // 更新顶部信息
+    this.updateStockInfo(stock);
+    
+    // 获取K线数据
+    const klineData = await this.api.getKlineData(stock.code, stock.market);
+    if (klineData) {
+      this.chart.setData(klineData);
+    }
+    
+    // 更新收藏按钮状态
+    const isFav = await this.db.isFavorite(stock.code);
+    document.getElementById('addFavoriteBtn').classList.toggle('favorited', isFav);
+    document.getElementById('addFavoriteBtn').textContent = isFav ? '已添加' : '+自选';
+    
+    // 隐藏tooltip
+    document.getElementById('klineTooltip').style.display = 'none';
+  }
+
+  updateStockInfo(stock) {
+    const infoEl = document.getElementById('stockInfo');
+    const isUp = stock.change >= 0;
+    
+    infoEl.innerHTML = `
+      <div class="stock-header">
+        <span class="stock-name-large">${stock.name}</span>
+        <span class="stock-code-large">${stock.code}</span>
+      </div>
+      <div class="price-info ${isUp ? 'up' : 'down'}">
+        <span class="current-price">${stock.price?.toFixed(2) || '--'}</span>
+        <span class="price-change">${isUp ? '+' : ''}${stock.change?.toFixed(2) || '--'}</span>
+        <span class="price-percent">${isUp ? '+' : ''}${stock.changePercent?.toFixed(2) || '--'}%</span>
+      </div>
+    `;
+  }
+
+  async refreshCurrentStock() {
+    if (!this.currentStock) return;
+    
+    const quote = await this.api.getQuote(this.currentStock.code, this.currentStock.market);
+    if (quote) {
+      this.currentStock = quote;
+      this.updateStockInfo(quote);
+    }
+  }
+
+  async toggleFavorite(stock) {
+    const isFav = await this.db.isFavorite(stock.code);
+    
+    if (isFav) {
+      await this.db.removeFavorite(stock.code);
+      this.favorites = this.favorites.filter(f => f.code !== stock.code);
+    } else {
+      await this.db.addFavorite({
+        code: stock.code,
+        name: stock.name,
+        market: stock.market,
+        addTime: Date.now()
+      });
+      this.favorites.push({
+        code: stock.code,
+        name: stock.name,
+        market: stock.market
+      });
+    }
+    
+    this.renderFavorites();
+    
+    const nowFav = await this.db.isFavorite(stock.code);
+    document.getElementById('addFavoriteBtn').classList.toggle('favorited', nowFav);
+    document.getElementById('addFavoriteBtn').textContent = nowFav ? '已添加' : '+自选';
+  }
+
+  renderFavorites() {
+    const container = document.getElementById('favoriteList');
+    
+    if (this.favorites.length === 0) {
+      container.innerHTML = '<div class="empty-tip">暂无自选股，搜索添加</div>';
+      return;
+    }
+    
+    container.innerHTML = this.favorites.map(stock => `
+      <div class="favorite-item" data-code="${stock.code}">
+        <div class="fav-info">
+          <span class="fav-name">${stock.name}</span>
+          <span class="fav-code">${stock.code}</span>
+        </div>
+        <div class="fav-price loading">--</div>
+        <button class="remove-btn" data-code="${stock.code}">删除</button>
+      </div>
+    `).join('');
+    
+    // 绑定点击事件
+    container.querySelectorAll('.favorite-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-btn')) {
+          const code = e.target.dataset.code;
+          this.removeFavorite(code);
         } else {
-          this.showToast('通知权限被拒绝', 'error');
-        }
-      });
-      this.ui.closeReminderModalBtn.addEventListener('click', () => {
-        this.ui.reminderModal.classList.add('hidden');
-      });
-      
-      // 提醒弹窗
-      this.ui.dismissReminderBtn.addEventListener('click', () => this.dismissCurrentReminder());
-      this.ui.viewReminderBtn.addEventListener('click', () => this.viewCurrentReminder());
-      
-      // 列表点击
-      this.ui.noteList.addEventListener('click', (e) => {
-        const item = e.target.closest('.note-item');
-        const markBtn = e.target.closest('.mark-btn');
-        
-        if (markBtn) {
-          const id = parseInt(markBtn.dataset.id);
-          this.toggleNoteMark(id);
-        } else if (item) {
-          const id = parseInt(item.dataset.id);
-          this.editNote(id);
-        }
-      });
-      
-      // 键盘快捷键
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          if (!this.ui.editModal.classList.contains('hidden')) {
-            this.closeModal();
-          } else if (!this.ui.searchPanel.classList.contains('hidden')) {
-            this.toggleSearch(false);
-          } else if (!this.ui.calendarPanel.classList.contains('hidden')) {
-            this.toggleCalendar(false);
-          } else if (!this.ui.morePanel.classList.contains('hidden')) {
-            this.toggleMoreMenu(false);
+          const code = item.dataset.code;
+          const stock = this.favorites.find(s => s.code === code);
+          if (stock) {
+            this.showStock(stock);
           }
         }
       });
-    }
+    });
+    
+    // 更新价格
+    this.updateFavoritesPrices();
+  }
 
-    async loadNotes() {
-      if (this.filterDate) {
-        this.notes = await this.db.getNotesByDate(this.filterDate);
-      } else if (this.searchKeyword) {
-        this.notes = await this.db.searchNotes(this.searchKeyword);
-      } else {
-        this.notes = await this.db.getAllNotes();
-      }
-      this.renderList();
-    }
-
-    renderList() {
-      this.ui.emptyState.classList.toggle('hidden', this.notes.length > 0);
-      this.ui.noteList.innerHTML = '';
-      
-      // 排序：标记的置顶，然后按创建时间倒序
-      const sortedNotes = [...this.notes].sort((a, b) => {
-        // 标记的优先
-        if (a.marked && !b.marked) return -1;
-        if (!a.marked && b.marked) return 1;
-        // 然后按时间
-        return (b.createdAt || 0) - (a.createdAt || 0);
-      });
-      
-      sortedNotes.forEach(note => {
-        const item = document.createElement('li');
-        item.className = 'note-item';
-        if (note.marked) item.classList.add('marked');
-        item.dataset.id = note.id;
-        
-        const hasReminder = note.reminderEnabled && note.reminderTime;
-        const reminderBadge = hasReminder && note.reminderTime > Date.now() 
-          ? `<span class="reminder-badge">🔔 ${this.parser.formatDisplay(new Date(note.reminderTime))}</span>`
-          : '';
-        
-        const markIcon = note.marked ? '⭐' : '☆';
-        const markClass = note.marked ? 'marked' : '';
-        
-        item.innerHTML = `
-          <button class="mark-btn ${markClass}" data-id="${note.id}">${markIcon}</button>
-          <div class="note-content">${this.escapeHtml(note.content)}</div>
-          <div class="note-meta">
-            <span class="note-time ${hasReminder ? 'has-reminder' : ''}">
-              ${reminderBadge}
-              ${this.formatDate(note.createdAt)}
-            </span>
-          </div>
-        `;
-        
-        this.ui.noteList.appendChild(item);
-      });
-    }
-
-    // 切换笔记标记
-    async toggleNoteMark(id) {
-      const note = await this.db.getNote(id);
-      note.marked = !note.marked;
-      await this.db.updateNote(note);
-      await this.loadNotes();
-      this.showToast(note.marked ? '已标记置顶' : '已取消标记', 'success');
-    }
-
-    // 初始化日历
-    initCalendar() {
-      this.currentCalendarDate = new Date();
-      this.renderCalendar();
-    }
-
-    renderCalendar() {
-      const year = this.currentCalendarDate.getFullYear();
-      const month = this.currentCalendarDate.getMonth();
-      
-      this.ui.calendarTitle.textContent = `${year}年${month + 1}月`;
-      this.ui.calendarGrid.innerHTML = '';
-      
-      // 获取当月第一天和最后一天
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const startWeekday = firstDay.getDay();
-      
-      // 添加星期标题
-      const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-      weekdays.forEach(w => {
-        const header = document.createElement('div');
-        header.className = 'calendar-header';
-        header.textContent = w;
-        this.ui.calendarGrid.appendChild(header);
-      });
-      
-      // 添加空白格子
-      for (let i = 0; i < startWeekday; i++) {
-        const empty = document.createElement('div');
-        empty.className = 'calendar-day empty';
-        this.ui.calendarGrid.appendChild(empty);
-      }
-      
-      // 添加日期格子
-      for (let day = 1; day <= lastDay.getDate(); day++) {
-        const dayEl = document.createElement('div');
-        dayEl.className = 'calendar-day';
-        dayEl.textContent = day;
-        
-        const dateStr = new Date(year, month, day).toLocaleDateString('zh-CN');
-        
-        // 检查是否有笔记
-        const hasNotes = this.notes.some(n => {
-          if (!n.createdAt) return false;
-          return new Date(n.createdAt).toLocaleDateString('zh-CN') === dateStr;
-        });
-        
-        if (hasNotes) dayEl.classList.add('has-notes');
-        
-        // 当前筛选的日期高亮
-        if (this.filterDate === dateStr) dayEl.classList.add('selected');
-        
-        // 今天高亮
-        const today = new Date().toLocaleDateString('zh-CN');
-        if (dateStr === today) dayEl.classList.add('today');
-        
-        dayEl.addEventListener('click', () => this.selectDate(dateStr));
-        this.ui.calendarGrid.appendChild(dayEl);
-      }
-    }
-
-    selectDate(dateStr) {
-      this.filterDate = dateStr;
-      this.ui.clearDateFilterBtn.classList.remove('hidden');
-      // 显示日期筛选指示器
-      const indicator = document.getElementById('dateFilterIndicator');
-      const textEl = document.getElementById('filterDateText');
-      if (indicator && textEl) {
-        textEl.textContent = `筛选: ${dateStr}`;
-        indicator.classList.remove('hidden');
-      }
-      this.toggleCalendar(false);
-      this.loadNotes();
-      this.showToast(`显示 ${dateStr} 的记录`, 'info');
-    }
-
-    clearDateFilter() {
-      this.filterDate = null;
-      this.ui.clearDateFilterBtn.classList.add('hidden');
-      // 隐藏日期筛选指示器
-      const indicator = document.getElementById('dateFilterIndicator');
-      if (indicator) {
-        indicator.classList.add('hidden');
-      }
-      this.loadNotes();
-      this.renderCalendar();
-    }
-
-    changeMonth(delta) {
-      this.currentCalendarDate.setMonth(this.currentCalendarDate.getMonth() + delta);
-      this.renderCalendar();
-    }
-
-    toggleCalendar(show) {
-      this.ui.calendarPanel.classList.toggle('hidden', !show);
-      if (show) this.renderCalendar();
-    }
-
-    toggleMoreMenu(show) {
-      this.ui.morePanel.classList.toggle('hidden', !show);
-    }
-
-    // 导出笔记
-    async exportNotes() {
-      const allNotes = await this.db.getAllNotes();
-      const exportData = {
-        version: 2,
-        exportDate: new Date().toISOString(),
-        notes: allNotes.map(n => ({
-          content: n.content,
-          createdAt: n.createdAt,
-          reminderTime: n.reminderTime,
-          reminderEnabled: n.reminderEnabled,
-          marked: n.marked || false,
-        }))
-      };
-      
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `智能记事本_${new Date().toLocaleDateString('zh-CN')}.json`;
-      a.click();
-      
-      URL.revokeObjectURL(url);
-      this.showToast('导出成功', 'success');
-      this.toggleMoreMenu(false);
-    }
-
-    // 导入笔记
-    async importNotes(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        
-        if (!data.notes || !Array.isArray(data.notes)) {
-          this.showToast('文件格式错误', 'error');
-          return;
-        }
-        
-        await this.db.importNotes(data.notes);
-        await this.loadNotes();
-        this.showToast(`成功导入 ${data.notes.length} 条记录`, 'success');
-        this.toggleMoreMenu(false);
-      } catch (err) {
-        this.showToast('导入失败: ' + err.message, 'error');
-      }
-      
-      e.target.value = '';
-    }
-
-    toggleSearch(show) {
-      this.ui.searchPanel.classList.toggle('hidden', !show);
-      if (show) this.ui.searchInput.focus();
-      else {
-        this.ui.searchInput.value = '';
-        this.handleSearch('');
-      }
-    }
-
-    async handleSearch(keyword) {
-      this.searchKeyword = keyword;
-      this.ui.clearSearchBtn.classList.toggle('hidden', !keyword);
-      await this.loadNotes();
-    }
-
-    async openModal(noteId) {
-      this.currentNoteId = noteId;
-      this.currentParsedTime = null;
-      
-      if (noteId) {
-        const note = this.notes.find(n => n.id === noteId) || await this.db.getNote(noteId);
-        if (note) {
-          this.ui.modalTitle.textContent = '编辑笔记';
-          this.ui.noteContent.value = note.content;
-          this.ui.deleteNoteBtn.classList.remove('hidden');
-          
-          if (note.reminderTime) {
-            this.ui.reminderTime.textContent = this.parser.formatDisplay(new Date(note.reminderTime));
-            this.ui.parsedReminder.classList.remove('hidden');
-            this.ui.toggleReminderBtn.classList.toggle('active', note.reminderEnabled);
-            this.ui.toggleReminderBtn.textContent = note.reminderEnabled ? '已启用' : '启用';
-            this.currentParsedTime = note.reminderTime;
-          } else {
-            this.ui.parsedReminder.classList.add('hidden');
-          }
-          
-          // 标记按钮
-          this.ui.toggleMarkBtn.classList.toggle('active', note.marked);
-          this.ui.toggleMarkBtn.textContent = note.marked ? '已标记' : '标记';
-        }
-      } else {
-        this.ui.modalTitle.textContent = '新建笔记';
-        this.ui.noteContent.value = '';
-        this.ui.deleteNoteBtn.classList.add('hidden');
-        this.ui.parsedReminder.classList.add('hidden');
-        this.ui.toggleMarkBtn.classList.remove('active');
-        this.ui.toggleMarkBtn.textContent = '标记';
-      }
-      
-      this.ui.editModal.classList.remove('hidden');
-      this.ui.noteContent.focus();
-    }
-
-    closeModal() {
-      this.ui.editModal.classList.add('hidden');
-      this.currentNoteId = null;
-      this.currentParsedTime = null;
-      this.ui.noteContent.value = '';
-      this.ui.parsedReminder.classList.add('hidden');
-    }
-
-    editNote(id) {
-      this.openModal(id);
-    }
-
-    parseContent() {
-      const content = this.ui.noteContent.value;
-      const parsed = this.parser.parse(content);
-      
-      if (parsed) {
-        this.ui.reminderTime.textContent = parsed.display;
-        this.ui.parsedReminder.classList.remove('hidden');
-        this.ui.toggleReminderBtn.classList.remove('active');
-        this.ui.toggleReminderBtn.textContent = '启用';
-        this.currentParsedTime = parsed.time.getTime();
-      } else {
-        this.ui.parsedReminder.classList.add('hidden');
-        this.currentParsedTime = null;
-      }
-    }
-
-    toggleReminder() {
-      const isActive = this.ui.toggleReminderBtn.classList.toggle('active');
-      this.ui.toggleReminderBtn.textContent = isActive ? '已启用' : '启用';
-    }
-
-    toggleMark() {
-      const isActive = this.ui.toggleMarkBtn.classList.toggle('active');
-      this.ui.toggleMarkBtn.textContent = isActive ? '已标记' : '标记';
-    }
-
-    setCustomTime() {
-      const input = this.ui.customTimeInput.value;
-      if (input) {
-        const customTime = new Date(input);
-        if (customTime > new Date()) {
-          this.currentParsedTime = customTime.getTime();
-          this.ui.reminderTime.textContent = this.parser.formatDisplay(customTime);
-          this.ui.parsedReminder.classList.remove('hidden');
-          this.ui.toggleReminderBtn.classList.add('active');
-          this.ui.toggleReminderBtn.textContent = '已启用';
-          this.showToast('自定义时间已设置', 'success');
-        } else {
-          this.showToast('请选择未来的时间', 'error');
-        }
-      }
-    }
-
-    async saveNote() {
-      const content = this.ui.noteContent.value.trim();
-      if (!content) {
-        this.showToast('请输入笔记内容', 'error');
-        return;
-      }
-      
-      const reminderEnabled = this.ui.toggleReminderBtn.classList.contains('active');
-      const marked = this.ui.toggleMarkBtn.classList.contains('active');
-      
-      const noteData = {
-        content,
-        reminderTime: this.currentParsedTime,
-        reminderEnabled,
-        marked,
-        updatedAt: Date.now(),
-      };
-      
-      try {
-        if (this.currentNoteId) {
-          const existing = await this.db.getNote(this.currentNoteId);
-          noteData.id = this.currentNoteId;
-          noteData.createdAt = existing.createdAt;
-          await this.db.updateNote(noteData);
-          this.showToast('笔记已更新', 'success');
-        } else {
-          noteData.createdAt = Date.now();
-          await this.db.addNote(noteData);
-          this.showToast('笔记已保存', 'success');
-        }
-        
-        await this.loadNotes();
-        this.closeModal();
-        
-        if (reminderEnabled && !this.reminderManager.permissionGranted) {
-          this.ui.reminderModal.classList.remove('hidden');
-        }
-      } catch (err) {
-        this.showToast('保存失败：' + err.message, 'error');
-      }
-    }
-
-    async deleteNote() {
-      if (!this.currentNoteId) return;
-      
-      if (!confirm('确定删除这条笔记？')) return;
-      
-      try {
-        await this.db.deleteNote(this.currentNoteId);
-        this.showToast('笔记已删除', 'success');
-        await this.loadNotes();
-        this.closeModal();
-      } catch (err) {
-        this.showToast('删除失败：' + err.message, 'error');
-      }
-    }
-
-    formatDate(timestamp) {
-      if (!timestamp) return '';
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diffDays = Math.floor((now - date) / (24 * 3600 * 1000));
-      
-      if (diffDays === 0) {
-        return '今天 ' + date.getHours() + ':' + date.getMinutes().toString().padStart(2, '0');
-      } else if (diffDays === 1) {
-        return '昨天';
-      } else if (diffDays < 7) {
-        return diffDays + '天前';
-      } else {
-        return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
-      }
-    }
-
-    escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // 显示提醒弹窗
-    showReminderAlert(note) {
-      this.currentReminderNote = note;
-      this.ui.reminderAlertContent.textContent = note.content;
-      this.ui.reminderAlert.classList.remove('hidden');
-      
-      // 振动（如果支持）
-      if ('vibrate' in navigator) {
-        navigator.vibrate([200, 100, 200, 100, 200]);
-      }
-    }
-
-    dismissCurrentReminder() {
-      if (this.currentReminderNote) {
-        this.reminderManager.dismissReminder(this.currentReminderNote.id);
-      }
-      this.ui.reminderAlert.classList.add('hidden');
-      this.currentReminderNote = null;
-    }
-
-    viewCurrentReminder() {
-      if (this.currentReminderNote) {
-        this.dismissCurrentReminder();
-        this.editNote(this.currentReminderNote.id);
-      }
-    }
-
-    showToast(message, type = '') {
-      this.ui.toast.textContent = message;
-      this.ui.toast.className = 'toast ' + type;
-      this.ui.toast.classList.remove('hidden');
-      
-      setTimeout(() => {
-        this.ui.toast.classList.add('hidden');
-      }, 2000);
-    }
-
-    async registerServiceWorker() {
-      if ('serviceWorker' in navigator) {
-        try {
-          await navigator.serviceWorker.register('/sw.js');
-        } catch (err) {
-          console.log('Service Worker 注册失败:', err);
+  async updateFavoritesPrices() {
+    for (const stock of this.favorites) {
+      const quote = await this.api.getQuote(stock.code, stock.market);
+      if (quote) {
+        const item = document.querySelector(`.favorite-item[data-code="${stock.code}"] .fav-price`);
+        if (item) {
+          item.classList.remove('loading');
+          item.classList.add(quote.change >= 0 ? 'up' : 'down');
+          item.innerHTML = `
+            <span>${quote.price.toFixed(2)}</span>
+            <span>${quote.change >= 0 ? '+' : ''}${quote.changePercent}%</span>
+          `;
         }
       }
     }
   }
 
-  // 启动应用
-  window.app = new App();
-})();
+  async removeFavorite(code) {
+    await this.db.removeFavorite(code);
+    this.favorites = this.favorites.filter(f => f.code !== code);
+    this.renderFavorites();
+    
+    if (this.currentStock?.code === code) {
+      document.getElementById('addFavoriteBtn').classList.remove('favorited');
+      document.getElementById('addFavoriteBtn').textContent = '+自选';
+    }
+  }
+
+  changePeriod(period) {
+    if (this.currentStock) {
+      this.api.getKlineData(this.currentStock.code, this.currentStock.market, period)
+        .then(data => {
+          if (data) this.chart.setData(data);
+        });
+    }
+  }
+
+  startRealtimeUpdate() {
+    // 每5秒更新一次行情
+    this.updateTimer = setInterval(() => {
+      this.refreshCurrentStock();
+      this.updateFavoritesPrices();
+    }, 5000);
+  }
+
+  stopRealtimeUpdate() {
+    if (this.updateTimer) {
+      clearInterval(this.updateTimer);
+      this.updateTimer = null;
+    }
+  }
+
+  // ==================== 价格提醒功能 ====================
+  showReminderModal(stock) {
+    const modal = document.getElementById('reminderModal');
+    const currentPrice = stock.price || 100;
+    
+    document.getElementById('reminderStockName').textContent = stock.name;
+    document.getElementById('reminderStockCode').textContent = stock.code;
+    document.getElementById('reminderTargetPrice').value = currentPrice.toFixed(2);
+    document.getElementById('reminderType').value = 'above';
+    
+    // 设置价格范围提示
+    document.getElementById('priceRangeTip').textContent = 
+      `当前价格: ${currentPrice.toFixed(2)}，设置目标价格`;
+    
+    modal.style.display = 'flex';
+  }
+
+  async saveReminder() {
+    const targetPrice = parseFloat(document.getElementById('reminderTargetPrice').value);
+    const type = document.getElementById('reminderType').value;
+    const note = document.getElementById('reminderNote').value;
+    
+    if (!targetPrice || targetPrice <= 0) {
+      alert('请输入有效的目标价格');
+      return;
+    }
+    
+    const reminder = {
+      code: this.currentStock.code,
+      name: this.currentStock.name,
+      market: this.currentStock.market,
+      targetPrice,
+      type, // 'above' 或 'below'
+      note,
+      currentPrice: this.currentStock.price,
+      created: Date.now(),
+      triggered: false
+    };
+    
+    await this.db.addReminder(reminder);
+    this.reminders.push(reminder);
+    
+    document.getElementById('reminderModal').style.display = 'none';
+    
+    alert(`提醒已设置！当 ${this.currentStock.name} 价格${type === 'above' ? '高于' : '低于'} ${targetPrice.toFixed(2)} 时将通知您。`);
+  }
+
+  async showReminderList() {
+    this.reminders = await this.db.getAllReminders();
+    const container = document.getElementById('reminderListContent');
+    
+    if (this.reminders.length === 0) {
+      container.innerHTML = '<div class="empty-tip">暂无价格提醒</div>';
+    } else {
+      container.innerHTML = this.reminders.map(r => `
+        <div class="reminder-item ${r.triggered ? 'triggered' : ''}">
+          <div class="reminder-info">
+            <span class="reminder-name">${r.name}</span>
+            <span class="reminder-condition">
+              ${r.type === 'above' ? '高于' : '低于'} ${r.targetPrice.toFixed(2)}
+            </span>
+            ${r.triggered ? '<span class="triggered-tag">已触发</span>' : ''}
+          </div>
+          <button class="remove-reminder-btn" data-id="${r.id}">删除</button>
+        </div>
+      `).join('');
+      
+      // 绑定删除事件
+      container.querySelectorAll('.remove-reminder-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = parseInt(btn.dataset.id);
+          await this.db.removeReminder(id);
+          this.reminders = this.reminders.filter(r => r.id !== id);
+          this.showReminderList();
+        });
+      });
+    }
+    
+    document.getElementById('reminderListModal').style.display = 'flex';
+  }
+
+  startReminderCheck() {
+    // 每10秒检查提醒
+    setInterval(() => this.checkReminders(), 10000);
+  }
+
+  async checkReminders() {
+    this.reminders = await this.db.getAllReminders();
+    
+    for (const reminder of this.reminders) {
+      if (reminder.triggered) continue;
+      
+      const quote = await this.api.getQuote(reminder.code, reminder.market);
+      if (!quote) continue;
+      
+      const shouldTrigger = reminder.type === 'above' 
+        ? quote.price >= reminder.targetPrice
+        : quote.price <= reminder.targetPrice;
+      
+      if (shouldTrigger) {
+        this.triggerReminder(reminder, quote.price);
+      }
+    }
+  }
+
+  async triggerReminder(reminder, currentPrice) {
+    reminder.triggered = true;
+    await this.db.addReminder(reminder);
+    
+    const title = '股价提醒';
+    const body = `${reminder.name}(${reminder.code}) 当前价格 ${currentPrice.toFixed(2)}，已${reminder.type === 'above' ? '高于' : '低于'}目标价 ${reminder.targetPrice.toFixed(2)}`;
+    
+    // 显示弹窗提醒
+    this.showPriceAlert(reminder, currentPrice);
+    
+    // 发送通知
+    this.sendNotification(title, body);
+    
+    // 播放提示音
+    this.playAlertSound();
+  }
+
+  showPriceAlert(reminder, currentPrice) {
+    const alertEl = document.getElementById('priceAlert');
+    document.getElementById('alertTitle').textContent = '价格提醒触发！';
+    document.getElementById('alertContent').innerHTML = `
+      <div class="alert-stock">${reminder.name} (${reminder.code})</div>
+      <div class="alert-price">当前价格: <strong>${currentPrice.toFixed(2)}</strong></div>
+      <div class="alert-target">目标价格: ${reminder.targetPrice.toFixed(2)} (${reminder.type === 'above' ? '高于' : '低于'})</div>
+      ${reminder.note ? `<div class="alert-note">备注: ${reminder.note}</div>` : ''}
+    `;
+    
+    alertEl.style.display = 'flex';
+    
+    document.getElementById('alertCloseBtn').onclick = () => {
+      alertEl.style.display = 'none';
+    };
+    
+    document.getElementById('alertViewBtn').onclick = () => {
+      alertEl.style.display = 'none';
+      const stock = { code: reminder.code, name: reminder.name, market: reminder.market };
+      this.showStock(stock);
+    };
+  }
+
+  requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  sendNotification(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: 'icons/icon-192.svg' });
+    }
+  }
+
+  playAlertSound() {
+    // 使用Web Audio API播放提示音
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      gainNode.gain.value = 0.3;
+      
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      oscillator.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+      console.log('无法播放提示音');
+    }
+  }
+}
+
+// ==================== 启动应用 ====================
+document.addEventListener('DOMContentLoaded', () => {
+  window.app = new StockApp();
+});
